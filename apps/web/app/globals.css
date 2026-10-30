@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b0d10;
+  --surface: #141414;
+  --elevated: #1c1c1c;
+  --border: #2e2e2e;
+  --text: #ffffff;
+  --muted: #b5b5b5;
+  --faint: #7a7a7a;
+  --lime: #c8ff2e;
+  --lime-dim: rgba(200, 255, 46, 0.14);
+  --warn: #ffb74d;
+  --error: #ff6e6e;
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --font-sans: var(--font-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-decoration: none;
+}
+
+/* Lime CTAs need dark ink — unlayered `color: inherit` was winning over Tailwind text utilities */
+.cta-lime {
+  background: var(--lime);
+  color: #0b0d10 !important;
+}
+
+::selection {
+  background: var(--lime);
+  color: #0b0d10;
+}

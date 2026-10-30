@@ -1,0 +1,19 @@
+# Minimal Supabase project config. Run `supabase init` locally if you need full defaults.
+# Linked remote: https://asxqvytuzvnklptwoilj.supabase.co (eu-north-1)
+project_id = "asxqvytuzvnklptwoilj"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
