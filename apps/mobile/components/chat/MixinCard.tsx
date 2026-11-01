@@ -1,7 +1,7 @@
 import { colors, radii, spacing } from '@padel-nerdz/config';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { formatMoney, priceBreakdown } from '@/lib/pricing';
+import { formatMoney, PLATFORM_FEE_CENTS, priceBreakdown } from '@/lib/pricing';
 import type { MyRegistrationState } from '@/lib/sessions';
 
 type Props = {
@@ -13,7 +13,7 @@ type Props = {
   maxPlayers?: number;
   /** Court share only (organiser input) */
   priceCents?: number | null;
-  /** @deprecated Fee is always 8% of court — ignored when computing total */
+  /** Platform fee before IVA — defaults to PLATFORM_FEE_CENTS (€1) */
   commissionCents?: number | null;
   /** Prefer this when payload already has the player-facing total */
   playerTotalCents?: number | null;
@@ -43,14 +43,16 @@ function formatWhen(iso: string) {
 
 function playerFacingPrice(
   courtCents?: number | null,
-  _commissionCents?: number | null,
+  commissionCents?: number | null,
   playerTotalCents?: number | null,
 ) {
   if (playerTotalCents != null && playerTotalCents > 0) {
     return formatMoney(playerTotalCents);
   }
   if (courtCents == null) return null;
-  return formatMoney(priceBreakdown(courtCents).playerTotalCents);
+  return formatMoney(
+    priceBreakdown(courtCents, commissionCents ?? PLATFORM_FEE_CENTS).playerTotalCents,
+  );
 }
 
 export function MixinCard({

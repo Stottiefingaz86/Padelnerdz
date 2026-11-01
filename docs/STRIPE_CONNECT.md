@@ -4,7 +4,7 @@ Padel Nerdz uses **Stripe Connect Express** so:
 
 1. Players pay one total in-app (card / Apple Pay / Google Pay via PaymentSheet)
 2. Organisers receive the **court share** on their connected account
-3. The platform keeps **8% of the event/court fee + IVA on that fee** as `application_fee_amount` on every charge
+3. The platform keeps **€1 fee + IVA** as `application_fee_amount` on every charge (including €0 court / free events)
 
 Revolut / Bizum P2P is no longer the product pay path.
 

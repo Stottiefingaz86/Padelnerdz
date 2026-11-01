@@ -18,7 +18,7 @@ import {
 import { addSessionToCalendar } from '@/lib/calendar';
 import { tap, success, warn, revolutPulse } from '@/lib/feedback';
 import { canOrganiseGroup, getGroup } from '@/lib/groups';
-import { formatMoney, priceBreakdown } from '@/lib/pricing';
+import { formatMoney, PLATFORM_FEE_CENTS, priceBreakdown } from '@/lib/pricing';
 import {
   getSession,
   listRegistrants,
@@ -318,7 +318,12 @@ export default function SessionDetailScreen() {
               </Text>
               {session.price_cents != null ? (
                 <Text style={styles.meta}>
-                  {formatMoney(priceBreakdown(session.price_cents).playerTotalCents)}{' '}
+                  {formatMoney(
+                    priceBreakdown(
+                      session.price_cents,
+                      session.commission_cents ?? PLATFORM_FEE_CENTS,
+                    ).playerTotalCents,
+                  )}{' '}
                   per player
                 </Text>
               ) : null}

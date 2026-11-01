@@ -299,7 +299,7 @@ Structure:
 ### Later
 - integrated marketplace checkout
 - organiser payout setup
-- platform fee (8% of event/court fee + IVA on that fee per paid booking)
+- platform fee (e.g. €1 per paid booking + IVA — fixed so free events still pay)
 - refunds, disputes, and revenue reporting
 
 ### Acceptance criteria

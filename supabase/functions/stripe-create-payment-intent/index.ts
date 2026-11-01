@@ -70,13 +70,13 @@ function corsHeaders(req: Request) {
 }
 
 
-/** 8% of event (court) fee + 21% IVA on that fee */
-const PLATFORM_FEE_RATE = 0.08;
+/** Fixed €1 platform fee + 21% IVA — charged even when court price is €0 */
+const PLATFORM_FEE_CENTS = 100;
 const PLATFORM_IVA_RATE = 0.21;
 
 function priceBreakdown(courtCents: number) {
   const court = Math.max(0, courtCents);
-  const fee = Math.round(court * PLATFORM_FEE_RATE);
+  const fee = PLATFORM_FEE_CENTS;
   const ivaCents = Math.round(fee * PLATFORM_IVA_RATE);
   const platformTakeCents = fee + ivaCents;
   return {

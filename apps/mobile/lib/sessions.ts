@@ -21,7 +21,7 @@ import {
   type DemoRegistration,
   type DemoSession,
 } from './demo-store';
-import { platformFeeCents, priceBreakdown } from './pricing';
+import { PLATFORM_FEE_CENTS, priceBreakdown } from './pricing';
 import { scheduleMixinReminder } from './push';
 import { getSupabase, getSupabaseLoose, isSupabaseConfigured } from './supabase';
 
@@ -163,8 +163,7 @@ export async function listGroupSessions(
       max_players: row.max_players as number,
       price_cents: (row.price_cents as number | null) ?? null,
       commission_cents:
-        (row as { commission_cents?: number | null }).commission_cents ??
-        platformFeeCents((row.price_cents as number | null) ?? 0),
+        (row as { commission_cents?: number | null }).commission_cents ?? PLATFORM_FEE_CENTS,
       banner_url: (row as { banner_url?: string | null }).banner_url ?? null,
       registered_count: count ?? 0,
       session_room_id: roomId,
@@ -234,9 +233,7 @@ export async function getSession(
     courts: data.courts as number,
     max_players: data.max_players as number,
     price_cents: (data.price_cents as number | null) ?? null,
-    commission_cents:
-      (data.commission_cents as number | null) ??
-      platformFeeCents((data.price_cents as number | null) ?? 0),
+    commission_cents: (data.commission_cents as number | null) ?? PLATFORM_FEE_CENTS,
     banner_url: (data.banner_url as string | null | undefined) ?? null,
     registered_count: count ?? 0,
     session_room_id: roomId,
@@ -269,8 +266,7 @@ export async function createMixIn(input: {
       courts: input.courts,
       max_players: input.maxPlayers,
       price_cents: input.priceCents ?? null,
-      commission_cents:
-        input.commissionCents ?? platformFeeCents(input.priceCents ?? 0),
+      commission_cents: input.commissionCents ?? PLATFORM_FEE_CENTS,
       banner_url: input.bannerUrl ?? null,
       created_by: input.userId,
       created_by_name: input.displayName,
@@ -303,8 +299,7 @@ export async function createMixIn(input: {
       courts: input.courts,
       max_players: input.maxPlayers,
       price_cents: input.priceCents ?? null,
-      commission_cents:
-        input.commissionCents ?? platformFeeCents(input.priceCents ?? 0),
+      commission_cents: input.commissionCents ?? PLATFORM_FEE_CENTS,
       currency: 'EUR',
       banner_url: input.bannerUrl ?? null,
       created_by: input.userId,
@@ -344,6 +339,7 @@ export async function createMixIn(input: {
 
   const playerTotal = totalChargeCents({
     price_cents: session.price_cents,
+    commission_cents: session.commission_cents ?? PLATFORM_FEE_CENTS,
   });
 
   await sendGroupMessage({
@@ -363,8 +359,7 @@ export async function createMixIn(input: {
       max_players: session.max_players,
       courts: session.courts,
       price_cents: session.price_cents,
-      commission_cents:
-        session.commission_cents ?? platformFeeCents(session.price_cents ?? 0),
+      commission_cents: session.commission_cents ?? PLATFORM_FEE_CENTS,
       /** Player-facing total (court + fee + IVA) — what the card must show */
       player_total_cents: playerTotal,
     },
@@ -1054,12 +1049,15 @@ export async function closeSession(input: {
   return { ...session, status: 'closed', wrap_media_url: wrapUri };
 }
 
-/** What the player pays — court + 8% fee + IVA on the fee. */
+/** What the player pays — court + fixed €1 fee + IVA on the fee. */
 export function totalChargeCents(session: {
   price_cents: number | null;
   commission_cents?: number | null;
 }) {
-  return priceBreakdown(session.price_cents).playerTotalCents;
+  return priceBreakdown(
+    session.price_cents,
+    session.commission_cents ?? PLATFORM_FEE_CENTS,
+  ).playerTotalCents;
 }
 
 /** Platform take (fee + IVA) — owner dashboard only, never shown in player UI. */
@@ -1067,7 +1065,10 @@ export function platformTakeCents(session: {
   price_cents: number | null;
   commission_cents?: number | null;
 }) {
-  return priceBreakdown(session.price_cents).platformTakeCents;
+  return priceBreakdown(
+    session.price_cents,
+    session.commission_cents ?? PLATFORM_FEE_CENTS,
+  ).platformTakeCents;
 }
 
 /** Organiser marks a player as did-not-show — reliability drops. */

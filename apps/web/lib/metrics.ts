@@ -39,10 +39,8 @@ export type ReadinessItem = {
   detail: string;
 };
 
-/** Platform take: 8% of event fees + 21% IVA on that fee (admin estimate uses avg court). */
-const FEE_RATE = 0.08;
+const FEE_EUR = 1;
 const IVA_RATE = 0.21;
-const ASSUMED_COURT_EUR = 14;
 
 function formatCount(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -119,13 +117,12 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
   if (stripe.error) errors.push(`Stripe: ${stripe.error}`);
 
   const paidCount = paidRegs.ok ? paidRegs.count : null;
-  const feePerPaid = ASSUMED_COURT_EUR * FEE_RATE;
-  const platformTake = feePerPaid * (1 + IVA_RATE);
+  const platformTake = FEE_EUR * (1 + IVA_RATE);
   const expectedTake =
     paidCount != null ? paidCount * platformTake : null;
-  const commissionNet = paidCount != null ? paidCount * feePerPaid : null;
+  const commissionNet = paidCount != null ? paidCount * FEE_EUR : null;
   const commissionIva =
-    paidCount != null ? paidCount * feePerPaid * IVA_RATE : null;
+    paidCount != null ? paidCount * FEE_EUR * IVA_RATE : null;
 
   const businessLive = signups.ok && paidRegs.ok;
   const productLive = posthog.source === "live";
@@ -256,7 +253,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
         id: "commission_net",
         label: "Commission (ex-IVA)",
         value: formatEur(commissionNet),
-        hint: "8% of court × paid (est. @ €14 court) — Stripe application_fee",
+        hint: "€1 × paid confirmations (Stripe application_fee)",
       },
       {
         id: "iva",
@@ -382,5 +379,5 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
 
 export const PRICING_COPY = {
   title: "Pricing rule · Stripe Connect",
-  body: "Organiser sets court price (e.g. €14). Player pays court + 8% platform fee + 21% IVA on that fee in one total (e.g. €15.36) via Stripe PaymentSheet. Destination charge: organiser receives the court share on their Connect Express account; Padel Nerdz keeps fee+IVA as application_fee_amount automatically.",
+  body: "Organiser sets court price (e.g. €14). Player pays court + €1 + 21% IVA on the €1 in one total (e.g. €15.21) via Stripe PaymentSheet — even if court is free. Destination charge: organiser receives the court share on their Connect Express account; Padel Nerdz keeps fee+IVA as application_fee_amount automatically.",
 };
