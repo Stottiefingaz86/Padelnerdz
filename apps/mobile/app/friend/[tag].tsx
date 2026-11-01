@@ -17,11 +17,11 @@ export default function AddFriendByLinkScreen() {
     void (async () => {
       try {
         const friend = await addFriendByTag(tag);
-        setMessage(`Added @${friend.friend_tag}`);
+        setMessage(`Follow request sent to @${friend.friend_tag}`);
         setStatus('ok');
         void success();
       } catch (e) {
-        setMessage(e instanceof Error ? e.message : 'Could not add friend');
+        setMessage(e instanceof Error ? e.message : 'Could not send follow');
         setStatus('err');
         void warn();
       }

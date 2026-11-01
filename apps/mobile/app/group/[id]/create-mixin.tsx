@@ -5,8 +5,10 @@ import { Screen, TextField } from '@padel-nerdz/ui';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { CircleHelp } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   Image,
   Platform,
   Pressable,
@@ -15,16 +17,16 @@ import {
   View,
 } from 'react-native';
 
+import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
-import { select, tap } from '@/lib/feedback';
+import { select, tap, warn } from '@/lib/feedback';
+import {
+  getGroupPaymentSettings,
+  isStripePayoutReady,
+} from '@/lib/payments';
 import { formatMoney, PLATFORM_FEE_CENTS, priceBreakdown } from '@/lib/pricing';
+import { MIXIN_FORMATS } from '@/lib/session-formats';
 import { createMixIn } from '@/lib/sessions';
-
-/** Only formats with a live engine. Americano/Mexicano stay hidden until built. */
-const FORMATS: { value: SessionFormat; label: string }[] = [
-  { value: 'kings_and_queens', label: 'Kings & Queens' },
-  { value: 'custom', label: 'Custom (open play)' },
-];
 
 function defaultStartDate() {
   const d = new Date();
@@ -88,6 +90,43 @@ export default function CreateMixInScreen() {
       setError('Add a title');
       return;
     }
+
+    const hasPrice = price.trim().length > 0 && Number(price.replace(',', '.')) > 0;
+    if (hasPrice && !isGuest) {
+      try {
+        const pay = await getGroupPaymentSettings(id, isGuest);
+        if (!isStripePayoutReady(pay)) {
+          void warn();
+          Alert.alert(
+            'Connect bank first',
+            'Paid mix-ins need Stripe payouts so you get the court share and Padel Nerdz takes the fee automatically.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Payments',
+                onPress: () => router.push(`/group/${id}/payments`),
+              },
+            ],
+          );
+          return;
+        }
+      } catch {
+        void warn();
+        Alert.alert(
+          'Payments unavailable',
+          'Couldn’t confirm Stripe payouts are ready. Check your connection, then open Admin → Payments before creating a paid mix-in.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Payments',
+              onPress: () => router.push(`/group/${id}/payments`),
+            },
+          ],
+        );
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       await createMixIn({
@@ -225,25 +264,66 @@ export default function CreateMixInScreen() {
         ) : null}
 
         <View style={styles.block}>
-          <Text style={styles.label}>Format</Text>
-          {FORMATS.map((item) => {
+          <Text style={styles.label}>Game type</Text>
+          {MIXIN_FORMATS.map((item) => {
             const selected = format === item.value;
             return (
-              <Pressable
+              <View
                 key={item.value}
-                onPress={() => {
-                  void select();
-                  setFormat(item.value);
-                }}
                 style={[styles.formatRow, selected && styles.formatSelected]}
               >
-                <Text style={[styles.formatLabel, selected && styles.formatLabelSelected]}>
-                  {item.label}
-                </Text>
-              </Pressable>
+                <Pressable
+                  style={styles.formatMain}
+                  onPress={() => {
+                    void select();
+                    setFormat(item.value);
+                    if (item.defaults) {
+                      setCourts(item.defaults.courts);
+                      setMaxPlayers(item.defaults.maxPlayers);
+                    }
+                  }}
+                >
+                  <View style={styles.formatTitleRow}>
+                    <Text style={[styles.formatLabel, selected && styles.formatLabelSelected]}>
+                      {item.label}
+                    </Text>
+                    {item.popular ? (
+                      <View style={styles.popularPill}>
+                        <Text style={styles.popularPillText}>Most popular</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.formatHint, selected && styles.formatHintSelected]}>
+                    {item.blurb}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.formatInfoBtn}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.label} rules`}
+                  onPress={() => {
+                    void tap();
+                    Alert.alert(item.label, item.rules, [{ text: 'Got it' }]);
+                  }}
+                >
+                  <Icon
+                    icon={CircleHelp}
+                    color={selected ? colors.accentGreen : colors.textMuted}
+                    size="md"
+                  />
+                </Pressable>
+              </View>
             );
           })}
         </View>
+
+        {format === 'tournament_by_wins' ? (
+          <Text style={styles.priceHint}>
+            Fixed doubles teams. Group stage: best of 9, every game won is a table point. Top 2
+            advance to cross semis, then 3rd/4th and the final. Tap ⓘ for the full walkthrough.
+          </Text>
+        ) : null}
 
         <TextField label="Courts" value={courts} onChangeText={setCourts} keyboardType="number-pad" />
         <TextField
@@ -356,16 +436,62 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   formatRow: {
-    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 56,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.elevated,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
+    paddingLeft: spacing.md,
+    paddingRight: 6,
+    paddingVertical: spacing.sm,
   },
   formatSelected: {
     borderColor: colors.accentGreen,
+  },
+  formatMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+    paddingVertical: 2,
+  },
+  formatTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  formatInfoBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popularPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: colors.accentGreenDim,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,46,0.4)',
+  },
+  popularPillText: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 10,
+    letterSpacing: 0.3,
+    color: colors.accentGreen,
+    textTransform: 'uppercase',
+  },
+  formatHint: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 12,
+    color: colors.textMuted,
+    lineHeight: 16,
+  },
+  formatHintSelected: {
+    color: colors.textSecondary,
   },
   formatLabel: {
     ...typography.bodyStrong,

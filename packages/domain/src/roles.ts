@@ -8,6 +8,7 @@ export const SESSION_FORMATS = [
   'kings_and_queens',
   'americano',
   'mexicano',
+  'tournament_by_wins',
   'custom',
 ] as const;
 export type SessionFormat = (typeof SESSION_FORMATS)[number];

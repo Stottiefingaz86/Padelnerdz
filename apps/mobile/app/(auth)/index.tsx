@@ -47,18 +47,20 @@ export default function WelcomeScreen() {
 
         <Animated.View entering={FadeInDown.delay(160).duration(300)} style={styles.actions}>
           <AppButton label="Sign up with phone" onPress={() => router.push('/(auth)/phone')} />
-          <Pressable
-            onPress={() => {
-              void tap();
-              void success();
-              continueAsGuest('Demo Player', { complete: true });
-              router.replace('/(tabs)/chats');
-            }}
-            hitSlop={8}
-            style={styles.demoLink}
-          >
-            <Text style={styles.demoText}>Just looking around? Try a quick demo</Text>
-          </Pressable>
+          {process.env.EXPO_PUBLIC_ALLOW_LOCAL_PHONE_FALLBACK === 'true' ? (
+            <Pressable
+              onPress={() => {
+                void tap();
+                void success();
+                continueAsGuest('Demo Player', { complete: true });
+                router.replace('/(tabs)/chats');
+              }}
+              hitSlop={8}
+              style={styles.demoLink}
+            >
+              <Text style={styles.demoText}>Just looking around? Try a quick demo</Text>
+            </Pressable>
+          ) : null}
         </Animated.View>
       </View>
     </View>

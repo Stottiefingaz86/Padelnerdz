@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/lib/auth';
 import { getActiveChannel } from '@/lib/chat-read';
-import { getChannelPrefs, isChannelSoundOn } from '@/lib/channel-prefs';
+import { isChannelMuted, isChannelSoundOn } from '@/lib/channel-prefs';
 import { lastDemoMessage, listDemoMemberships, subscribeDemoStore } from '@/lib/demo-store';
 import { chatAlert, success } from '@/lib/feedback';
 import {
@@ -64,8 +64,7 @@ export function ChatNotifier() {
     if (input.senderId && input.senderId === userId) return;
     if (getActiveChannel() === input.channelId) return;
 
-    const prefs = await getChannelPrefs(input.channelId);
-    if (prefs.muted) return;
+    if (await isChannelMuted(input.channelId)) return;
 
     if (await isChannelSoundOn(input.channelId)) void chatAlert(input.channelId);
 

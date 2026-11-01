@@ -17,9 +17,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
 import { deleteMyAccount, exportMyData } from '@/lib/account';
 import {
+  biometricLabel,
   canUseBiometric,
+  confirmBiometricEnrollment,
+  getBiometricKind,
   isBiometricLockEnabled,
   setBiometricLockEnabled,
+  type BiometricKind,
 } from '@/lib/biometric';
 import { success, tap, warn } from '@/lib/feedback';
 import { useGlassHeaderOffset } from '@/lib/layout';
@@ -34,10 +38,13 @@ export default function PrivacySettingsScreen() {
   const { profile, offline, signOut } = useAuth();
   const [bioOn, setBioOn] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioKind, setBioKind] = useState<BiometricKind>('none');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void (async () => {
+      const kind = await getBiometricKind();
+      setBioKind(kind);
       setBioAvailable(await canUseBiometric());
       setBioOn(await isBiometricLockEnabled());
     })();
@@ -116,11 +123,15 @@ export default function PrivacySettingsScreen() {
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>App lock</Text>
+              <Text style={styles.rowTitle}>
+                {bioAvailable ? `${biometricLabel(bioKind)} lock` : 'App lock'}
+              </Text>
               <Text style={styles.rowMeta}>
                 {bioAvailable
-                  ? 'Require Face ID / fingerprint when opening the app'
-                  : 'Biometrics not available on this device'}
+                  ? `Require ${biometricLabel(bioKind)} when opening Padel Nerdz. Device passcode is not used.`
+                  : bioKind === 'none'
+                    ? 'This device has no Face ID / fingerprint hardware.'
+                    : `Set up ${biometricLabel(bioKind)} in iPhone Settings first, then return here.`}
               </Text>
             </View>
             <Switch
@@ -128,9 +139,20 @@ export default function PrivacySettingsScreen() {
               disabled={!bioAvailable || busy}
               onValueChange={(v) => {
                 void (async () => {
+                  void tap();
+                  if (v) {
+                    const ok = await confirmBiometricEnrollment();
+                    if (!ok) {
+                      Alert.alert(
+                        biometricLabel(bioKind),
+                        `Couldn’t verify ${biometricLabel(bioKind)}. Try again, or check Settings → Face ID & Passcode.`,
+                      );
+                      return;
+                    }
+                  }
                   await setBiometricLockEnabled(v);
                   setBioOn(v);
-                  void tap();
+                  if (v) void success();
                 })();
               }}
               trackColor={{ true: colors.accentGreen, false: colors.border }}

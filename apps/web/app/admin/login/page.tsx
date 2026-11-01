@@ -11,7 +11,7 @@ export default async function AdminLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0B0D10] px-6">
+    <main className="flex min-h-screen items-center justify-center bg-[#0F1115] px-6">
       <div className="w-full max-w-sm">
         <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#C8FF2E]">
           Padel Nerdz

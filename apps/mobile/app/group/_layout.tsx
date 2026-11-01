@@ -37,6 +37,8 @@ export default function GroupLayout() {
       <Stack.Screen name="[id]/create-mixin" options={{ title: 'Create mix-in' }} />
       <Stack.Screen name="[id]/settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="[id]/admin" options={{ title: 'Admin' }} />
+      <Stack.Screen name="[id]/check-in/[sessionId]" options={{ title: 'Check-in' }} />
+      <Stack.Screen name="[id]/leaderboard" options={{ title: 'Leaderboard' }} />
       <Stack.Screen name="[id]/payments" options={{ title: 'Payments' }} />
       <Stack.Screen name="[id]/member/[userId]" options={{ title: 'Member' }} />
       <Stack.Screen name="[id]/select/[sessionId]" options={{ title: 'Confirm lineup' }} />
@@ -44,11 +46,15 @@ export default function GroupLayout() {
       <Stack.Screen name="[id]/pay/[sessionId]" options={{ title: 'Confirm place' }} />
       <Stack.Screen
         name="[id]/verify-payments/[sessionId]"
-        options={{ title: 'Verify payments' }}
+        options={{ title: 'Payments' }}
       />
       <Stack.Screen name="[id]/session/[sessionId]" options={{ title: 'Mix-in' }} />
       <Stack.Screen name="[id]/fill-spot/[sessionId]" options={{ title: 'Fill spot' }} />
       <Stack.Screen name="[id]/session-room/[roomId]" options={{ title: 'Session room' }} />
+      <Stack.Screen
+        name="[id]/wrap/[sessionId]"
+        options={{ title: 'Session wrap', headerShown: false, animation: 'fade' }}
+      />
     </Stack>
   );
 }

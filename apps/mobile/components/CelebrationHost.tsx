@@ -12,13 +12,17 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { ConfettiBurst } from '@/components/ConfettiBurst';
+import { MedalBadge } from '@/components/MedalBadge';
+import type { MissionTier } from '@/lib/achievements';
 import { celebratePulse } from '@/lib/feedback';
 
 type Celebration = {
   title: string;
   body?: string;
-  /** Short brand mark (no emoji). */
+  /** Short brand mark on the medal */
   mark?: string;
+  tier?: MissionTier;
+  achievementId?: string;
   /** @deprecated use mark */
   emoji?: string;
 };
@@ -37,7 +41,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
     if (hideTimer.current) clearTimeout(hideTimer.current);
     setActive(input);
     void celebratePulse();
-    hideTimer.current = setTimeout(() => setActive(null), 3200);
+    hideTimer.current = setTimeout(() => setActive(null), 4200);
   }, []);
 
   const value = useMemo(() => ({ celebrate }), [celebrate]);
@@ -46,19 +50,36 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
     <CelebrationContext.Provider value={value}>
       {children}
       <Modal visible={Boolean(active)} transparent animationType="fade" statusBarTranslucent>
-        <Pressable style={styles.backdrop} onPress={() => setActive(null)}>
-          {active ? <ConfettiBurst /> : null}
-          {active ? (
-            <Animated.View entering={ZoomIn.duration(280)} exiting={FadeOut} style={styles.card}>
-              <Animated.View entering={FadeIn.delay(80)} style={styles.markWrap}>
-                <Text style={styles.mark}>{active.mark ?? active.emoji ?? 'PN'}</Text>
+        <View style={styles.root}>
+          <Pressable style={styles.backdrop} onPress={() => setActive(null)}>
+            {active ? (
+              <Animated.View
+                entering={ZoomIn.duration(280)}
+                exiting={FadeOut}
+                style={styles.card}
+              >
+                <Animated.View entering={FadeIn.delay(80)} style={styles.medalWrap}>
+                  <MedalBadge
+                    mark={active.mark ?? active.emoji ?? 'PN'}
+                    tier={active.tier ?? 'gold'}
+                    unlocked
+                    size="hero"
+                    achievementId={active.achievementId}
+                  />
+                </Animated.View>
+                <Text style={styles.kicker}>MISSION UNLOCKED</Text>
+                <Text style={styles.title}>{active.title}</Text>
+                {active.body ? <Text style={styles.body}>{active.body}</Text> : null}
+                <Text style={styles.hint}>Tap anywhere</Text>
               </Animated.View>
-              <Text style={styles.title}>{active.title}</Text>
-              {active.body ? <Text style={styles.body}>{active.body}</Text> : null}
-              <Text style={styles.hint}>Tap anywhere</Text>
-            </Animated.View>
+            ) : null}
+          </Pressable>
+          {active ? (
+            <View pointerEvents="none" style={styles.confettiLayer}>
+              <ConfettiBurst count={140} />
+            </View>
           ) : null}
-        </Pressable>
+        </View>
       </Modal>
     </CelebrationContext.Provider>
   );
@@ -77,12 +98,20 @@ export function useCelebration() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  root: {
     flex: 1,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 28,
+  },
+  confettiLayer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
+    elevation: 20,
   },
   card: {
     backgroundColor: colors.elevated,
@@ -96,21 +125,13 @@ const styles = StyleSheet.create({
     maxWidth: 340,
     width: '100%',
   },
-  markWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-    backgroundColor: 'rgba(200,255,46,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(200,255,46,0.4)',
+  medalWrap: {
+    marginBottom: 8,
   },
-  mark: {
-    fontFamily: 'Figtree_700Bold',
-    fontSize: 22,
-    letterSpacing: 0.4,
+  kicker: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 11,
+    letterSpacing: 1.2,
     color: colors.accentGreen,
   },
   title: {

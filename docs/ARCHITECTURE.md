@@ -22,19 +22,22 @@ Preferred options:
 Recommendation: use a battle-tested chat layer if budget allows, while keeping padel domain logic separate.
 
 ### Media
-- Cloudflare R2 for object storage
+- **Now:** Supabase Storage (private bucket + short-lived signed URLs)
+- **Later (optional):** Cloudflare R2 for object storage / CDN when media volume or egress needs it
 - signed URLs / time-limited access
 - client-side compression and preview generation
+
+> Cloudflare is **not** required for app security. Auth, RLS, Edge Function checks, and signed media already cover the threat model for beta. Do not add Cloudflare WAF/Workers as a substitute for fixing RLS or payment authorization bugs.
 
 ### Push notifications
 - Expo Notifications initially
 - later native optimization if needed
 
 ### Payments
-Now:
-- manual payment method records
-Later:
-- Stripe Connect or equivalent marketplace payments
+- Stripe Connect Express (destination charges)
+- Platform `application_fee` = fee + IVA
+- Organiser connected account receives court share
+- Mobile PaymentSheet (card; Apple Pay / Google Pay when merchant IDs configured)
 
 ### Video/recap pipeline
 - Remotion for programmatic recap generation

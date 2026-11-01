@@ -18,7 +18,7 @@ export default async function AdminDashboardPage() {
   const posthogLive = metrics.posthogDashboardUrl != null;
 
   return (
-    <main className="min-h-screen bg-[#0B0D10] px-6 py-10 text-white sm:px-10">
+    <main className="min-h-screen bg-[#0F1115] px-6 py-10 text-white sm:px-10">
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -112,6 +112,62 @@ export default async function AdminDashboardPage() {
           ))}
         </div>
 
+        <h2 className="mt-12 text-lg font-semibold">Stripe Connect</h2>
+        <p className="mt-2 max-w-2xl text-sm text-[#B5B5B5]">
+          Live platform account + Supabase Connect counters. Platform must have
+          charges enabled before real player payments settle.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {metrics.stripe.map((m) => (
+            <div
+              key={m.id}
+              className="rounded-2xl border border-[#2E2E2E] bg-[#141414] p-4"
+            >
+              <p
+                className={`text-2xl font-bold tracking-[-0.02em] ${
+                  m.accent ? "text-[#C8FF2E]" : "text-white"
+                }`}
+              >
+                {m.value}
+              </p>
+              <p className="mt-1 text-sm font-medium text-[#B5B5B5]">{m.label}</p>
+              {m.hint ? (
+                <p className="mt-2 text-xs leading-relaxed text-[#7A7A7A]">{m.hint}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <a
+            href={metrics.stripeDashboardUrl ?? "https://dashboard.stripe.com"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cta-lime inline-flex h-11 items-center rounded-full px-5 text-sm font-semibold"
+            style={{ color: "#0F1115" }}
+          >
+            Open Stripe Dashboard
+          </a>
+          <a
+            href="https://dashboard.stripe.com/settings/connect"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-11 items-center rounded-full border border-[#2E2E2E] px-4 text-sm text-[#B5B5B5] hover:text-white"
+          >
+            Connect settings
+          </a>
+          <span
+            className={`inline-flex h-11 items-center rounded-full border px-4 text-sm ${
+              metrics.stripeStatus.chargesEnabled
+                ? "border-[#C8FF2E]/40 text-[#C8FF2E]"
+                : "border-[#FF6E6E]/40 text-[#FFB4B4]"
+            }`}
+          >
+            {metrics.stripeStatus.chargesEnabled
+              ? "Platform can take payments"
+              : "Finish Stripe onboarding (individual OK)"}
+          </span>
+        </div>
+
         <h2 className="mt-12 text-lg font-semibold">PostHog · product</h2>
         <p className="mt-2 max-w-2xl text-sm text-[#B5B5B5]">
           Last-7-day totals from PostHog Query API only. If a card shows —, the
@@ -139,7 +195,7 @@ export default async function AdminDashboardPage() {
             target="_blank"
             rel="noopener noreferrer"
             className="cta-lime inline-flex h-11 items-center rounded-full px-5 text-sm font-semibold"
-            style={{ color: "#0B0D10" }}
+            style={{ color: "#0F1115" }}
           >
             Open PostHog
           </a>

@@ -50,7 +50,7 @@ export function LoginForm() {
         type="submit"
         disabled={busy}
         className="cta-lime flex h-12 w-full items-center justify-center rounded-full text-sm font-semibold disabled:opacity-60"
-        style={{ color: "#0B0D10" }}
+        style={{ color: "#0F1115" }}
       >
         {busy ? "Signing in…" : "Enter"}
       </button>

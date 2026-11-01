@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { getFollowState } from './friends';
 import { requestRemoteChatPush } from './push';
 import { getSupabaseLoose, isSupabaseConfigured } from './supabase';
 
@@ -103,11 +104,11 @@ function orderedPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
-/** Organiser opens (or reuses) a DM with a group member. */
+/** Open (or reuse) a DM — only after follow is approved (friends). */
 export async function openDmWithMember(input: {
   peerId: string;
   peerName: string;
-  groupId: string;
+  groupId?: string | null;
   actorId: string;
   isGuest: boolean;
 }): Promise<string> {
@@ -115,7 +116,20 @@ export async function openDmWithMember(input: {
     throw new Error('You can’t message yourself');
   }
 
-  if (input.isGuest || !isSupabaseConfigured || input.groupId.startsWith('demo-')) {
+  const follow = await getFollowState(input.peerId, input.isGuest);
+  if (follow !== 'friends') {
+    throw new Error(
+      follow === 'outgoing'
+        ? 'Waiting for them to approve your follow before you can message.'
+        : follow === 'incoming'
+          ? 'Approve their follow request first, then you can message.'
+          : 'Follow them first — messaging unlocks after they approve.',
+    );
+  }
+
+  const groupId = input.groupId?.startsWith('demo-') ? null : input.groupId ?? null;
+
+  if (input.isGuest || !isSupabaseConfigured || input.peerId.startsWith('demo-')) {
     const [user_a, user_b] = orderedPair(input.actorId, input.peerId);
     const threads = await loadDemoThreads();
     const existing = threads.find((t) => t.user_a === user_a && t.user_b === user_b);
@@ -129,7 +143,7 @@ export async function openDmWithMember(input: {
       id,
       user_a,
       user_b,
-      context_group_id: input.groupId,
+      context_group_id: groupId,
       created_by: input.actorId,
       last_message_at: new Date().toISOString(),
       peer_name: input.peerName,
@@ -140,9 +154,9 @@ export async function openDmWithMember(input: {
 
   const { data, error } = await getSupabaseLoose().rpc('open_dm_thread', {
     p_peer_id: input.peerId,
-    p_group_id: input.groupId,
+    p_group_id: groupId,
   });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   if (!data || typeof data !== 'string') throw new Error('Could not open chat');
   return data;
 }

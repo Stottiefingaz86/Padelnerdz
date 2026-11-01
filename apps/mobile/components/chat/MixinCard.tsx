@@ -27,7 +27,6 @@ type Props = {
   onPay: () => void;
   onSelectPlayers: () => void;
   onOpenSessionRoom: () => void;
-  onViewDetails?: () => void;
   busy?: boolean;
 };
 
@@ -76,7 +75,6 @@ export function MixinCard({
   onPay,
   onSelectPlayers,
   onOpenSessionRoom,
-  onViewDetails,
   busy,
 }: Props) {
   const price = playerFacingPrice(priceCents, commissionCents, playerTotalCents);
@@ -87,7 +85,15 @@ export function MixinCard({
   let primaryDisabled = false;
   let secondarySelf: { label: string; onPress: () => void; disabled?: boolean } | null = null;
 
-  if (organiserNeedsLineup) {
+  if (myState === 'paid') {
+    primaryLabel = 'Open session chat';
+    primaryAction = onOpenSessionRoom;
+    primaryDisabled = false;
+  } else if (myState === 'awaiting_verify') {
+    primaryLabel = hasSessionRoom ? 'Open session chat' : 'Paid — waiting for organiser';
+    primaryAction = hasSessionRoom ? onOpenSessionRoom : () => {};
+    primaryDisabled = !hasSessionRoom;
+  } else if (organiserNeedsLineup) {
     primaryLabel =
       registeredCount > 0
         ? `Confirm lineup · ${registeredCount} interested`
@@ -97,7 +103,7 @@ export function MixinCard({
     if (myState === 'none') {
       secondarySelf = { label: 'I want to play', onPress: onRegister };
     } else if (myState === 'interested' || myState === 'waitlisted') {
-      secondarySelf = { label: 'You’re in — interested', onPress: () => {}, disabled: true };
+      secondarySelf = { label: 'You’re interested', onPress: () => {}, disabled: true };
     } else if (myState === 'selected_pay') {
       secondarySelf = {
         label: price ? `Pay ${price}` : 'Pay to confirm',
@@ -113,10 +119,6 @@ export function MixinCard({
   } else if (myState === 'selected_pay') {
     primaryLabel = price ? `Pay ${price} to confirm` : 'Pay to confirm place';
     primaryAction = onPay;
-  } else if (myState === 'paid') {
-    primaryLabel = hasSessionRoom ? 'Open session chat' : 'Confirmed';
-    primaryAction = hasSessionRoom ? onOpenSessionRoom : onPay;
-    primaryDisabled = !hasSessionRoom;
   } else if (lineupConfirmed && myState === 'none') {
     primaryLabel = 'Lineup closed';
     primaryDisabled = true;
@@ -139,7 +141,11 @@ export function MixinCard({
         </View>
 
         <Text style={styles.kicker}>
-          {lineupConfirmed ? 'LINEUP CONFIRMED' : 'MIX-IN OPEN'}
+          {myState === 'paid'
+            ? 'PLACE CONFIRMED'
+            : lineupConfirmed
+              ? 'LINEUP CONFIRMED'
+              : 'MIX-IN OPEN'}
         </Text>
         <Text style={styles.title}>{title}</Text>
 
@@ -156,19 +162,6 @@ export function MixinCard({
               .filter(Boolean)
               .join(' · ')}
           </Text>
-          {organiserNeedsLineup ? (
-            <Text style={styles.note}>
-              Pick who plays in Admin or tap Confirm lineup — don’t leave it buried in chat.
-            </Text>
-          ) : null}
-          {myState === 'interested' && !organiserNeedsLineup ? (
-            <Text style={styles.note}>Waiting for organiser to confirm the lineup.</Text>
-          ) : null}
-          {myState === 'selected_pay' ? (
-            <Text style={styles.note}>
-              You were selected — pay first to lock your place. Session chat unlocks after payment.
-            </Text>
-          ) : null}
         </View>
 
         <Pressable
@@ -183,7 +176,7 @@ export function MixinCard({
           <Text style={styles.primaryBtnText}>{busy ? '…' : primaryLabel}</Text>
         </Pressable>
 
-        {secondarySelf ? (
+        {secondarySelf && myState !== 'paid' ? (
           <Pressable
             onPress={secondarySelf.onPress}
             disabled={secondarySelf.disabled || busy}
@@ -192,21 +185,6 @@ export function MixinCard({
             <Text style={styles.secondaryBtnText}>{secondarySelf.label}</Text>
           </Pressable>
         ) : null}
-
-        <View style={styles.secondaryRow}>
-          {onViewDetails ? (
-            <Pressable onPress={onViewDetails}>
-              <Text style={styles.link}>View details</Text>
-            </Pressable>
-          ) : (
-            <View />
-          )}
-          {isOrganiser && lineupConfirmed && hasSessionRoom ? (
-            <Pressable onPress={onOpenSessionRoom}>
-              <Text style={styles.link}>Session chat</Text>
-            </Pressable>
-          ) : null}
-        </View>
       </View>
     </View>
   );
@@ -299,13 +277,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 18,
   },
-  note: {
-    marginTop: 6,
-    fontFamily: 'Figtree_500Medium',
-    fontSize: 13,
-    color: colors.warning,
-    lineHeight: 18,
-  },
   primaryBtn: {
     backgroundColor: colors.accentGreen,
     borderRadius: radii.pill,
@@ -337,15 +308,4 @@ const styles = StyleSheet.create({
     color: colors.accentGreen,
   },
   btnDisabled: { opacity: 0.55 },
-  secondaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingHorizontal: 2,
-  },
-  link: {
-    fontFamily: 'Figtree_600SemiBold',
-    fontSize: 13,
-    color: colors.accentGreen,
-  },
 });

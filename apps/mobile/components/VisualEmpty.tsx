@@ -17,14 +17,20 @@ type Props = {
   actions?: Action[];
   /** Full-bleed photo — use brand / court stills from assets/images/empty/ */
   image?: ImageSourcePropType;
-  /** cover crops; contain shows full artwork (wide globe art) */
+  /** cover crops; contain shows full artwork */
   imageFit?: 'cover' | 'contain';
+  /**
+   * Hero box aspect (width / height). Prefer this over heroHeight so the
+   * bitmap can match the frame and never letterbox.
+   */
+  heroAspectRatio?: number;
+  /** Fixed height fallback when aspect ratio is omitted */
   heroHeight?: number;
 };
 
 /**
  * Empty surfaces with a real photo hero + clear CTAs.
- * Copy sits under the image so branded stills (logo on photo) aren’t covered.
+ * Copy sits under the image so branded stills aren’t covered.
  */
 export function VisualEmpty({
   kicker,
@@ -33,19 +39,23 @@ export function VisualEmpty({
   actions = [],
   image,
   imageFit = 'cover',
-  heroHeight = 160,
+  heroAspectRatio = 16 / 9,
+  heroHeight,
 }: Props) {
+  const heroBox =
+    heroHeight != null
+      ? { height: heroHeight }
+      : { aspectRatio: heroAspectRatio };
+
   return (
     <View style={styles.wrap}>
-      <View style={[styles.hero, { height: heroHeight }]}>
+      <View style={[styles.hero, heroBox]}>
         {image ? (
           <Image
             source={image}
-            style={[
-              styles.heroImage,
-              imageFit === 'contain' ? styles.heroContain : null,
-            ]}
+            style={styles.heroImage}
             resizeMode={imageFit}
+            accessibilityIgnoresInvertColors
           />
         ) : (
           <View style={styles.heroFallback} />
@@ -83,22 +93,29 @@ export function VisualEmpty({
 const styles = StyleSheet.create({
   wrap: { gap: 10, paddingVertical: spacing.sm },
   hero: {
+    width: '100%',
+    position: 'relative',
     borderRadius: radii.xl,
     overflow: 'hidden',
-    backgroundColor: '#0B0D10',
+    backgroundColor: colors.elevated,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
   },
   heroImage: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     width: '100%',
     height: '100%',
   },
-  heroContain: {
-    // keep letterbox black so wide branded art isn’t crushed
-  },
   heroFallback: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: '#1a1f18',
   },
   kicker: {

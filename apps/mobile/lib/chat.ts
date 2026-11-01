@@ -207,6 +207,7 @@ export async function listSessionRoomMessages(
         kind === 'system' ||
         kind === 'players_card' ||
         kind === 'fixtures_card' ||
+        kind === 'arrival_card' ||
         kind === 'mixin_card' ||
         kind === 'accept_notice' ||
         kind === 'wrap_card'
@@ -221,6 +222,61 @@ export async function listSessionRoomMessages(
   });
 }
 
+/** Posts the arrival check-in guide once per session room. */
+export async function ensureArrivalGuideMessage(input: {
+  roomId: string;
+  sessionId: string;
+  venue?: string | null;
+  title?: string | null;
+  userId: string;
+  isGuest: boolean;
+}): Promise<boolean> {
+  const msgs = await listSessionRoomMessages(input.roomId, input.userId, input.isGuest);
+  if (msgs.some((m) => m.kind === 'arrival_card')) return false;
+  await sendSessionRoomMessage({
+    roomId: input.roomId,
+    userId: input.userId,
+    displayName: 'Padel Nerdz',
+    body: 'When you arrive',
+    isGuest: input.isGuest,
+    kind: 'arrival_card',
+    payload: {
+      session_id: input.sessionId,
+      venue_label: input.venue ?? null,
+      title: input.title ?? null,
+    },
+  });
+  return true;
+}
+
+async function assertSessionRoomAcceptsMessages(
+  roomId: string,
+  isGuest: boolean,
+  kind: MessageKind,
+) {
+  // Closing flow may still post wrap/system into an archived room.
+  if (kind === 'wrap_card' || kind === 'system') return;
+
+  if (isGuest || !isSupabaseConfigured || roomId.startsWith('demo-')) {
+    const { getDemoSessionByRoomId } = await import('./demo-store');
+    const hit = getDemoSessionByRoomId(roomId);
+    if (hit?.status === 'closed') {
+      throw new Error('This session is closed — chat is read-only.');
+    }
+    return;
+  }
+
+  const { data: room } = await getSupabaseLoose()
+    .from('session_rooms')
+    .select('session_id, sessions(status)')
+    .eq('id', roomId)
+    .maybeSingle();
+  const status = (room?.sessions as { status?: string } | null)?.status;
+  if (status === 'closed') {
+    throw new Error('This session is closed — chat is read-only.');
+  }
+}
+
 export async function sendSessionRoomMessage(input: {
   roomId: string;
   userId: string;
@@ -233,15 +289,31 @@ export async function sendSessionRoomMessage(input: {
   const kind = input.kind ?? 'text';
   const body =
     input.body.trim() ||
-    (kind === 'image' ? 'Photo' : kind === 'video' ? 'Video' : '');
+    (kind === 'image'
+      ? 'Photo'
+      : kind === 'video'
+        ? 'Video'
+        : kind === 'arrival_card'
+          ? 'When you arrive'
+          : kind === 'wrap_card'
+            ? 'Session wrap'
+            : '');
   if (!body) throw new Error('Message cannot be empty');
+
+  await assertSessionRoomAcceptsMessages(input.roomId, input.isGuest, kind);
 
   if (input.isGuest || !isSupabaseConfigured || input.roomId.startsWith('demo-')) {
     return mapMessage(
       sendDemoSessionRoomMessage({
         session_room_id: input.roomId,
-        sender_id: input.userId,
-        sender_name: input.displayName,
+        sender_id:
+          kind === 'arrival_card' || kind === 'system' || kind === 'wrap_card'
+            ? null
+            : input.userId,
+        sender_name:
+          kind === 'arrival_card' || kind === 'system' || kind === 'wrap_card'
+            ? 'Padel Nerdz'
+            : input.displayName,
         body,
         kind,
         payload: input.payload,

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-[#0B0D10] px-6 py-12 text-white sm:px-10">
+    <main className="min-h-screen bg-[#0F1115] px-6 py-12 text-white sm:px-10">
       <div className="mx-auto max-w-2xl">
         <Link href="/" className="text-sm text-[#C8FF2E]">
           ← Padel Nerdz
@@ -51,11 +51,11 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-white">Payments</h2>
             <p>
-              Court fees may be paid peer-to-peer (e.g. Revolut, Bizum, cash).
-              Padel Nerdz does not currently process card payments or hold
-              player funds. Organisers and players are responsible for settling
-              amounts outside the platform unless we enable integrated payments
-              later.
+              Mix-in places are paid in-app via Stripe Connect. The player pays
+              one total; the organiser’s connected Stripe account receives the
+              court share, and Padel Nerdz retains a platform service fee
+              (including applicable IVA) as an application fee. Payout timing
+              follows Stripe’s schedules and organiser onboarding status.
             </p>
           </section>
 

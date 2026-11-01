@@ -1,8 +1,9 @@
 import { colors } from '@padel-nerdz/config';
 import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 import { Platform, Pressable, StyleSheet } from 'react-native';
 
-import { FlatChevronLeft } from '@/components/FlatIcons';
+import { Icon } from '@/components/Icon';
 import { tap } from '@/lib/feedback';
 
 type Props = {
@@ -44,7 +45,7 @@ export function HeaderBack({ fallbackHref }: Props) {
       accessibilityLabel="Back"
       android_ripple={{ color: 'transparent' }}
     >
-      <FlatChevronLeft color={colors.accentGreen} size={22} />
+      <Icon icon={ChevronLeft} color={colors.accentGreen} size="md" strokeWidth={2.25} />
     </Pressable>
   );
 }
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
   btn: {
     width: 44,
     height: 44,
-    marginLeft: Platform.OS === 'ios' ? -4 : 0,
+    marginLeft: Platform.OS === 'ios' ? -6 : 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

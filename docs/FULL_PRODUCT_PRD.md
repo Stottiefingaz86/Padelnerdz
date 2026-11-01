@@ -255,6 +255,19 @@ Rules:
 - dynamically balanced matchups based on performance
 - best for competitive play
 
+### 13.4 Tournament by wins
+Big events with skill categories and fixed doubles teams.
+
+Structure:
+- Categories (e.g. A higher, B lower)
+- Groups per category (e.g. A1/A2, B1/B2) with 3–4 teams each
+- Group stage: each team plays every other team in the group once
+- Matches are best of 9 games; **games won = table points** (a 5–4 loss still earns 4 points)
+- Top 2 from each group advance
+- Semi-finals: group leaders play 2nd place of the other group (cross)
+- Knockout matches are best of 9; only the match winner advances (group points stop mattering)
+- 3rd/4th place match, then the final (per category)
+
 ### Acceptance criteria
 - organiser can choose format
 - system can generate pairings and standings per format

@@ -1,10 +1,14 @@
 import { colors, spacing } from '@padel-nerdz/config';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Bell, BellOff } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,10 +16,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FlatSettingsIcon } from '@/components/FlatSettingsIcon';
+import { Avatar } from '@/components/Avatar';
+import { Icon } from '@/components/Icon';
 import { MemberRow } from '@/components/chat/MemberRow';
 import { useAuth } from '@/lib/auth';
-import { select, tap } from '@/lib/feedback';
+import {
+  formatMuteLabel,
+  getChannelPrefs,
+  muteChannel,
+  unmuteChannel,
+  type ChannelPrefs,
+  type MuteDuration,
+} from '@/lib/channel-prefs';
+import { select, success, tap } from '@/lib/feedback';
 import { useGlassHeaderOffset } from '@/lib/layout';
 import {
   canOrganiseGroup,
@@ -41,20 +54,27 @@ export default function GroupDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mutePrefs, setMutePrefs] = useState<ChannelPrefs>({
+    muted: false,
+    sounds: true,
+    muteUntil: null,
+  });
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
     setLoading(true);
     setError(null);
     try {
-      const [next, people, upcoming] = await Promise.all([
+      const [next, people, upcoming, prefs] = await Promise.all([
         getGroup(id, userId, isGuest),
         listGroupMembers(id, userId, isGuest),
         listGroupSessions(id, isGuest),
+        getChannelPrefs(id),
       ]);
       setGroup(next);
       setMembers(people);
       setSessions(upcoming);
+      setMutePrefs(prefs);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load group');
     } finally {
@@ -89,6 +109,82 @@ export default function GroupDetailScreen() {
     }
   }
 
+  async function applyMute(duration: MuteDuration) {
+    if (!id) return;
+    const next = await muteChannel(id, duration);
+    setMutePrefs(next);
+    void success();
+  }
+
+  async function clearMute() {
+    if (!id) return;
+    const next = await unmuteChannel(id);
+    setMutePrefs(next);
+    void success();
+  }
+
+  function openMuteOptions() {
+    void tap();
+    if (mutePrefs.muted) {
+      const unmute = () => void clearMute();
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            title: formatMuteLabel(mutePrefs),
+            options: ['Unmute', 'Cancel'],
+            cancelButtonIndex: 1,
+          },
+          (i) => {
+            if (i === 0) unmute();
+          },
+        );
+        return;
+      }
+      Alert.alert(formatMuteLabel(mutePrefs), undefined, [
+        { text: 'Unmute', onPress: unmute },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    const options = [
+      'Mute for 8 hours',
+      'Mute for 1 week',
+      'Mute always',
+      'Cancel',
+    ] as const;
+    const run = (label: (typeof options)[number]) => {
+      if (label === 'Mute for 8 hours') void applyMute('8h');
+      else if (label === 'Mute for 1 week') void applyMute('1w');
+      else if (label === 'Mute always') void applyMute('always');
+    };
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: 'Mute notifications',
+          message: 'No sounds or alerts from this group until unmute.',
+          options: [...options],
+          cancelButtonIndex: 3,
+        },
+        (i) => {
+          const label = options[i];
+          if (!label || label === 'Cancel') return;
+          void select();
+          run(label);
+        },
+      );
+      return;
+    }
+
+    Alert.alert('Mute notifications', 'No sounds or alerts from this group until unmute.', [
+      { text: '8 hours', onPress: () => run('Mute for 8 hours') },
+      { text: '1 week', onPress: () => run('Mute for 1 week') },
+      { text: 'Always', onPress: () => run('Mute always') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -116,20 +212,48 @@ export default function GroupDetailScreen() {
         options={{
           title: 'Group',
           headerBackTitle: 'Chat',
-          headerRight: organiser
-            ? () => (
-                <Pressable
-                  onPress={() => {
-                    void tap();
-                    router.push(`/group/${group.id}/admin`);
-                  }}
-                  hitSlop={10}
-                  style={styles.gearBtn}
+          headerRight: () =>
+            organiser ? (
+              <Pressable
+                onPress={() => {
+                  void tap();
+                  router.push(`/group/${group.id}/admin`);
+                }}
+                hitSlop={8}
+                style={styles.adminBtn}
+                accessibilityLabel="Admin panel"
+              >
+                <Text style={styles.adminBtnText}>Admin panel</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.headerStack} accessibilityLabel={`${members.length} members`}>
+                {members.length === 0 ? (
+                  <View style={styles.headerStackEmpty}>
+                    <Text style={styles.headerStackEmptyText}>0</Text>
+                  </View>
+                ) : (
+                  members.slice(0, 5).map((m, i) => (
+                    <View
+                      key={m.user_id}
+                      style={[
+                        styles.headerStackAvatar,
+                        { marginLeft: i === 0 ? 0 : -10, zIndex: 5 - i },
+                      ]}
+                    >
+                      <Avatar name={m.display_name} size={28} />
+                    </View>
+                  ))
+                )}
+                <View
+                  style={[
+                    styles.headerStackMore,
+                    { marginLeft: members.length === 0 ? 4 : -8, zIndex: 0 },
+                  ]}
                 >
-                  <FlatSettingsIcon />
-                </Pressable>
-              )
-            : undefined,
+                  <Text style={styles.headerStackMoreText}>{members.length}</Text>
+                </View>
+              </View>
+            ),
         }}
       />
       <FlatList
@@ -143,8 +267,11 @@ export default function GroupDetailScreen() {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              {group.cover_url ? (
-                <Image source={{ uri: group.cover_url }} style={styles.avatarImage} />
+              {group.avatar_url || group.cover_url ? (
+                <Image
+                  source={{ uri: group.avatar_url || group.cover_url! }}
+                  style={styles.avatarImage}
+                />
               ) : (
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{group.name.slice(0, 1).toUpperCase()}</Text>
@@ -163,7 +290,7 @@ export default function GroupDetailScreen() {
             {group.is_member ? (
               <View style={styles.tiles}>
                 <Pressable
-                  style={[styles.tile, styles.tilePrimary]}
+                  style={[styles.tile, styles.tilePrimary, styles.tileFull]}
                   onPress={() => {
                     void tap();
                     router.push(`/group/${group.id}/chat`);
@@ -171,16 +298,55 @@ export default function GroupDetailScreen() {
                 >
                   <Text style={styles.tilePrimaryText}>Open chat</Text>
                 </Pressable>
-                <Pressable
-                  style={styles.tile}
-                  onPress={() => {
-                    void tap();
-                    router.push(`/group/${group.id}/invite`);
-                  }}
-                >
-                  <Text style={styles.tileText}>Invite</Text>
-                </Pressable>
+                <View style={styles.tileRow}>
+                  <Pressable
+                    style={[styles.tile, styles.tileFlex]}
+                    onPress={() => {
+                      void tap();
+                      router.push(`/group/${group.id}/leaderboard`);
+                    }}
+                  >
+                    <Text style={styles.tileText} numberOfLines={1}>
+                      Leaderboard
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.tile, styles.tileFlex]}
+                    onPress={() => {
+                      void tap();
+                      router.push(`/group/${group.id}/invite`);
+                    }}
+                  >
+                    <Text style={styles.tileText}>Invite</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.tile,
+                      styles.tileFlex,
+                      styles.tileMute,
+                      mutePrefs.muted && styles.tileMuteOn,
+                    ]}
+                    onPress={openMuteOptions}
+                    accessibilityRole="button"
+                    accessibilityLabel={formatMuteLabel(mutePrefs)}
+                  >
+                    <Icon
+                      icon={mutePrefs.muted ? BellOff : Bell}
+                      color={mutePrefs.muted ? colors.accentGreen : colors.textPrimary}
+                      size={18}
+                    />
+                    <Text
+                      style={[styles.tileText, mutePrefs.muted && styles.tileMuteText]}
+                      numberOfLines={1}
+                    >
+                      {mutePrefs.muted ? 'Muted' : 'Mute'}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
+            ) : null}
+            {group.is_member && mutePrefs.muted ? (
+              <Text style={styles.muteHint}>{formatMuteLabel(mutePrefs)}</Text>
             ) : null}
 
             {canJoin || needsApproval ? (
@@ -283,7 +449,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gearBtn: { paddingHorizontal: 10, paddingVertical: 4 },
   hero: {
     alignItems: 'center',
     paddingTop: spacing.lg,
@@ -338,33 +503,109 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   tiles: {
-    flexDirection: 'row',
     gap: 8,
-    justifyContent: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderSubtle,
   },
+  tileRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   tile: {
-    minWidth: 100,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
+    minHeight: 48,
     borderRadius: 12,
     backgroundColor: colors.elevated,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
+  tileFull: { alignSelf: 'stretch' },
+  tileFlex: { flex: 1 },
+  tileMute: { flexDirection: 'row', gap: 6 },
   tilePrimary: { backgroundColor: colors.accentGreen },
+  tileMuteOn: {
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,46,0.4)',
+    backgroundColor: colors.accentGreenDim,
+  },
+  tileMuteText: { color: colors.accentGreen },
+  muteHint: {
+    textAlign: 'center',
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 12,
+    color: colors.textMuted,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    marginTop: -4,
+  },
   tileText: {
     fontFamily: 'Figtree_600SemiBold',
-    fontSize: 14,
+    fontSize: 13,
     color: colors.accentGreen,
   },
   tilePrimaryText: {
     fontFamily: 'Figtree_700Bold',
-    fontSize: 14,
+    fontSize: 15,
     color: '#0B0D10',
+  },
+  adminBtn: {
+    marginRight: Platform.OS === 'ios' ? 4 : 8,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminBtnText: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  headerStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: Platform.OS === 'ios' ? 8 : 12,
+    minHeight: 44,
+  },
+  headerStackAvatar: {
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.background,
+    overflow: 'hidden',
+  },
+  headerStackMore: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.elevated,
+    borderWidth: 2,
+    borderColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerStackMoreText: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 10,
+    color: colors.textPrimary,
+  },
+  headerStackEmpty: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerStackEmptyText: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 11,
+    color: colors.textMuted,
   },
   joinBtn: {
     marginHorizontal: spacing.md,

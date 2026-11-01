@@ -4,7 +4,11 @@
  */
 
 import { fetchPostHogProductStats } from "./posthog-stats";
-import { supabaseAdminCount, getSupabaseAdminConfig } from "./supabase-admin";
+import {
+  fetchStripePlatformStatus,
+  type StripePlatformStatus,
+} from "./stripe-admin";
+import { getSupabaseAdminConfig, supabaseAdminCount } from "./supabase-admin";
 
 export type AdminMetric = {
   id: string;
@@ -18,9 +22,12 @@ export type AdminMetricsSnapshot = {
   updatedAt: string;
   source: "live" | "partial" | "unconfigured";
   business: AdminMetric[];
+  stripe: AdminMetric[];
   product: AdminMetric[];
   note: string;
   posthogDashboardUrl: string | null;
+  stripeDashboardUrl: string | null;
+  stripeStatus: StripePlatformStatus;
   readiness: ReadinessItem[];
   errors: string[];
 };
@@ -53,7 +60,18 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
   const errors: string[] = [];
   const supabaseReady = Boolean(getSupabaseAdminConfig());
 
-  const [signups, groups, sessions, paidRegs, posthog] = await Promise.all([
+  const [
+    signups,
+    groups,
+    sessions,
+    paidRegs,
+    connectedGroups,
+    payoutReadyGroups,
+    paymentIntents,
+    succeededIntents,
+    posthog,
+    stripe,
+  ] = await Promise.all([
     supabaseReady
       ? supabaseAdminCount("profiles")
       : Promise.resolve({
@@ -69,7 +87,26 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
     supabaseReady
       ? supabaseAdminCount("session_registrations", "status=eq.paid")
       : Promise.resolve({ ok: false as const, error: "Supabase not configured" }),
+    supabaseReady
+      ? supabaseAdminCount(
+          "group_payment_settings",
+          "stripe_account_id=not.is.null",
+        )
+      : Promise.resolve({ ok: false as const, error: "Supabase not configured" }),
+    supabaseReady
+      ? supabaseAdminCount(
+          "group_payment_settings",
+          "stripe_charges_enabled=eq.true",
+        )
+      : Promise.resolve({ ok: false as const, error: "Supabase not configured" }),
+    supabaseReady
+      ? supabaseAdminCount("session_payment_intents")
+      : Promise.resolve({ ok: false as const, error: "Supabase not configured" }),
+    supabaseReady
+      ? supabaseAdminCount("session_payment_intents", "status=eq.succeeded")
+      : Promise.resolve({ ok: false as const, error: "Supabase not configured" }),
     fetchPostHogProductStats(),
+    fetchStripePlatformStatus(),
   ]);
 
   if (!signups.ok) errors.push(signups.error);
@@ -77,10 +114,10 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
   if (!sessions.ok && supabaseReady) errors.push(sessions.error);
   if (!paidRegs.ok && supabaseReady) errors.push(paidRegs.error);
   if (posthog.error) errors.push(`PostHog: ${posthog.error}`);
+  if (stripe.error) errors.push(`Stripe: ${stripe.error}`);
 
   const paidCount = paidRegs.ok ? paidRegs.count : null;
   const platformTake = FEE_EUR * (1 + IVA_RATE);
-  // Expected take from confirmed paid registrations only (manual P2P — not collected in-app)
   const expectedTake =
     paidCount != null ? paidCount * platformTake : null;
   const commissionNet = paidCount != null ? paidCount * FEE_EUR : null;
@@ -90,7 +127,6 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
   const businessLive = signups.ok && paidRegs.ok;
   const productLive = posthog.source === "live";
 
-  // Twilio was hardcoded red — detect from env + real phone profiles (e.g. Chris OTP signup).
   const localFallbackOn =
     process.env.EXPO_PUBLIC_ALLOW_LOCAL_PHONE_FALLBACK === "true" ||
     process.env.ALLOW_LOCAL_PHONE_FALLBACK === "true";
@@ -113,6 +149,23 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
   } else {
     twilioDetail =
       "No phone profiles yet. Enable Twilio Verify in Supabase Auth → Phone, or set TWILIO_VERIFY_READY=true after wiring it.";
+  }
+
+  const stripeLiveReady =
+    stripe.configured &&
+    stripe.mode === "live" &&
+    stripe.chargesEnabled &&
+    !stripe.error;
+  let stripeDetail: string;
+  if (!stripe.configured) {
+    stripeDetail =
+      "Add STRIPE_SECRET_KEY to apps/web/.env.local and set the same key + STRIPE_WEBHOOK_SECRET on Supabase Edge Functions.";
+  } else if (stripe.error && !stripe.accountId) {
+    stripeDetail = stripe.error;
+  } else if (!stripe.detailsSubmitted || !stripe.chargesEnabled) {
+    stripeDetail = `Keys wired (${stripe.mode}) on ${stripe.accountId ?? "account"} — open Stripe account onboarding and finish as an individual (name, ID, bank). You do not need a company or tax advisor for that step.`;
+  } else {
+    stripeDetail = `Live Connect · ${stripe.accountId} · ${stripe.country?.toUpperCase() ?? "?"} · destination charges keep fee+IVA on the platform.`;
   }
 
   const readiness: ReadinessItem[] = [
@@ -143,10 +196,9 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
     },
     {
       id: "payments",
-      label: "Bizum / Revolut",
-      ok: true,
-      detail:
-        "Manual P2P: player claims I’ve paid → organiser verifies in-app after checking Revolut/Bizum. Session unlocks only on organiser confirm. No bank webhook / escrow yet.",
+      label: "Stripe Connect",
+      ok: stripeLiveReady,
+      detail: stripeDetail,
     },
     {
       id: "rls",
@@ -197,7 +249,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
         id: "commission_net",
         label: "Commission (ex-IVA)",
         value: formatEur(commissionNet),
-        hint: "€1 × paid confirmations (not auto-collected)",
+        hint: "€1 × paid confirmations (Stripe application_fee)",
       },
       {
         id: "iva",
@@ -209,7 +261,71 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
         label: "Expected take (fee+IVA)",
         value: formatEur(expectedTake),
         accent: true,
-        hint: "Bizum/Revolut are P2P — invoice or Connect later to collect",
+        hint: "Collected automatically via Stripe Connect application_fee",
+      },
+    ],
+    stripe: [
+      {
+        id: "stripe_mode",
+        label: "Stripe mode",
+        value: stripe.configured ? stripe.mode : "—",
+        hint: stripe.accountId ?? undefined,
+        accent: stripe.mode === "live",
+      },
+      {
+        id: "stripe_charges",
+        label: "Platform charges",
+        value: !stripe.configured
+          ? "—"
+          : stripe.chargesEnabled
+            ? "Enabled"
+            : "Blocked",
+        hint: stripe.chargesEnabled
+          ? "Platform can take live payments"
+          : "Complete Stripe account activation",
+      },
+      {
+        id: "connect_groups",
+        label: "Groups on Connect",
+        value: formatCount(
+          connectedGroups.ok ? connectedGroups.count : null,
+        ),
+        hint: "group_payment_settings.stripe_account_id set",
+      },
+      {
+        id: "payout_ready",
+        label: "Organisers payout-ready",
+        value: formatCount(
+          payoutReadyGroups.ok ? payoutReadyGroups.count : null,
+        ),
+        hint: "stripe_charges_enabled = true",
+      },
+      {
+        id: "payment_intents",
+        label: "Payment intents",
+        value: formatCount(paymentIntents.ok ? paymentIntents.count : null),
+        hint: "session_payment_intents rows",
+      },
+      {
+        id: "succeeded_intents",
+        label: "Succeeded intents",
+        value: formatCount(
+          succeededIntents.ok ? succeededIntents.count : null,
+        ),
+        hint: "Webhook-confirmed Stripe payments",
+        accent: true,
+      },
+      {
+        id: "stripe_balance",
+        label: "Platform balance (EUR)",
+        value: formatEur(stripe.balanceAvailableEur),
+        hint: "Stripe available balance on platform account",
+      },
+      {
+        id: "stripe_connected_accounts",
+        label: "Stripe connected accounts",
+        value: formatCount(stripe.connectedAccounts),
+        hint: "Express accounts on this platform (API)",
       },
     ],
     product: [
@@ -250,12 +366,14 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
     posthogDashboardUrl: projectId
       ? `${posthogHost}/project/${projectId}`
       : `${posthogHost}`,
+    stripeDashboardUrl: stripe.dashboardUrl,
+    stripeStatus: stripe,
     readiness,
     errors,
   };
 }
 
 export const PRICING_COPY = {
-  title: "Pricing rule",
-  body: "Organiser sets court price (e.g. €14). Player pays court + €1 + 21% IVA on the €1 (= €15.21). Only the total is shown in the consumer app. Platform fee is recorded when the player taps I’ve paid — money moves peer-to-peer via Bizum/Revolut, not through Padel Nerdz.",
+  title: "Pricing rule · Stripe Connect",
+  body: "Organiser sets court price (e.g. €14). Player pays court + €1 + 21% IVA on the €1 in one total (e.g. €15.21) via Stripe PaymentSheet. Destination charge: organiser receives the court share on their Connect Express account; Padel Nerdz keeps fee+IVA as application_fee_amount automatically.",
 };

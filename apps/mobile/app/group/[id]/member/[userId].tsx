@@ -1,4 +1,4 @@
-import { colors, spacing } from '@padel-nerdz/config';
+import { colors, radii, spacing } from '@padel-nerdz/config';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -15,10 +15,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { Avatar } from '@/components/Avatar';
+import { MedalBadge } from '@/components/MedalBadge';
 import { useAuth } from '@/lib/auth';
+import {
+  listAchievements,
+  listAchievementsForUser,
+  type MissionProgress,
+} from '@/lib/achievements';
 import { select, success, tap, warn } from '@/lib/feedback';
 import { openDmWithMember } from '@/lib/dm';
-import { addFriendFromMember, isFriend } from '@/lib/friends';
+import {
+  acceptFriendRequest,
+  declineFriendRequest,
+  getFollowState,
+  listFriendRequests,
+  requestFollow,
+  type FollowState,
+} from '@/lib/friends';
 import { useGlassHeaderOffset } from '@/lib/layout';
 import {
   blockGroupMember,
@@ -56,7 +69,10 @@ export default function MemberAdminScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [messaging, setMessaging] = useState(false);
-  const [alreadyFriend, setAlreadyFriend] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followState, setFollowState] = useState<FollowState>('none');
+  const [incomingRequestId, setIncomingRequestId] = useState<string | null>(null);
+  const [medals, setMedals] = useState<MissionProgress[]>([]);
 
   const load = useCallback(async () => {
     if (!id || !memberId) return;
@@ -71,7 +87,35 @@ export default function MemberAdminScreen() {
       if (m) {
         setLevel(m.organiser_level);
         setNotes(m.notes);
-        setAlreadyFriend(await isFriend(m.user_id));
+        const state = await getFollowState(m.user_id, isGuest);
+        setFollowState(state);
+        if (state === 'incoming') {
+          const reqs = await listFriendRequests(isGuest);
+          setIncomingRequestId(reqs.find((r) => r.from_id === m.user_id)?.id ?? null);
+        } else {
+          setIncomingRequestId(null);
+        }
+        const isSelf = m.is_you || m.user_id === viewerId;
+        const stats = {
+          mixins_paid: m.sessions_played,
+          wins: m.best_finish === 1 ? 1 : 0,
+          podiums: m.best_finish != null && m.best_finish <= 3 ? 1 : 0,
+          groups_joined: 1,
+          hosted: 0,
+          no_shows: m.no_shows,
+          closed_played: m.sessions_played,
+          group_top1_count: m.group_rank === 1 ? 1 : 0,
+        };
+        setMedals(
+          isSelf
+            ? await listAchievements(stats)
+            : await listAchievementsForUser(m.user_id, {
+                isGuest,
+                stats,
+              }),
+        );
+      } else {
+        setMedals([]);
       }
     } finally {
       setLoading(false);
@@ -149,11 +193,105 @@ export default function MemberAdminScreen() {
           </Text>
           {!member.is_you ? (
             <View style={styles.friendBtn}>
+              {followState === 'incoming' ? (
+                <>
+                  <AppButton
+                    label="Approve follow"
+                    loading={followBusy}
+                    onPress={() => {
+                      void tap();
+                      if (!incomingRequestId || followBusy) return;
+                      void (async () => {
+                        setFollowBusy(true);
+                        try {
+                          await acceptFriendRequest(incomingRequestId, isGuest);
+                          setFollowState('friends');
+                          setIncomingRequestId(null);
+                          void success();
+                        } catch (e) {
+                          void warn();
+                          Alert.alert(
+                            'Couldn’t approve',
+                            e instanceof Error ? e.message : 'Try again',
+                          );
+                        } finally {
+                          setFollowBusy(false);
+                        }
+                      })();
+                    }}
+                  />
+                  <AppButton
+                    label="Decline"
+                    variant="secondary"
+                    disabled={followBusy || !incomingRequestId}
+                    onPress={() => {
+                      void tap();
+                      if (!incomingRequestId) return;
+                      void (async () => {
+                        setFollowBusy(true);
+                        try {
+                          await declineFriendRequest(incomingRequestId, isGuest);
+                          setFollowState('none');
+                          setIncomingRequestId(null);
+                        } finally {
+                          setFollowBusy(false);
+                        }
+                      })();
+                    }}
+                  />
+                </>
+              ) : (
+                <AppButton
+                  label={
+                    followState === 'friends'
+                      ? 'Following ✓'
+                      : followState === 'outgoing'
+                        ? 'Requested'
+                        : 'Follow'
+                  }
+                  variant={followState === 'friends' ? 'secondary' : 'primary'}
+                  loading={followBusy}
+                  disabled={followState === 'friends' || followState === 'outgoing'}
+                  onPress={() => {
+                    void tap();
+                    if (followBusy || followState !== 'none') return;
+                    void (async () => {
+                      setFollowBusy(true);
+                      try {
+                        const next = await requestFollow({
+                          peerId: member.user_id,
+                          displayName: member.display_name,
+                          isGuest,
+                        });
+                        setFollowState(next);
+                        if (next === 'incoming') {
+                          const reqs = await listFriendRequests(isGuest);
+                          setIncomingRequestId(
+                            reqs.find((r) => r.from_id === member.user_id)?.id ?? null,
+                          );
+                        }
+                        void success();
+                      } catch (e) {
+                        void warn();
+                        Alert.alert(
+                          'Couldn’t follow',
+                          e instanceof Error ? e.message : 'Try again',
+                        );
+                      } finally {
+                        setFollowBusy(false);
+                      }
+                    })();
+                  }}
+                />
+              )}
               <AppButton
                 label="Message"
+                variant="secondary"
+                disabled={followState !== 'friends'}
+                loading={messaging}
                 onPress={() => {
                   void tap();
-                  if (!id || messaging) return;
+                  if (!id || messaging || followState !== 'friends') return;
                   void (async () => {
                     setMessaging(true);
                     try {
@@ -177,28 +315,6 @@ export default function MemberAdminScreen() {
                     }
                   })();
                 }}
-                loading={messaging}
-              />
-              <AppButton
-                label={alreadyFriend ? 'Friends ✓' : 'Add friend'}
-                variant="secondary"
-                onPress={() => {
-                  void tap();
-                  if (alreadyFriend) return;
-                  void (async () => {
-                    try {
-                      await addFriendFromMember({
-                        userId: member.user_id,
-                        displayName: member.display_name,
-                      });
-                      setAlreadyFriend(true);
-                      void success();
-                    } catch {
-                      void warn();
-                    }
-                  })();
-                }}
-                disabled={alreadyFriend}
               />
             </View>
           ) : null}
@@ -207,9 +323,13 @@ export default function MemberAdminScreen() {
         {!member.is_you ? (
           <View style={styles.dmHint}>
             <Text style={styles.dmHintText}>
-              {organiser
-                ? 'Private inbox message — suggest a short trial hit to gauge level before a mix-in.'
-                : 'Opens in their Inbox. Both of you can keep chatting there.'}
+              {followState === 'friends'
+                ? 'You’re connected — message opens in Inbox.'
+                : followState === 'outgoing'
+                  ? 'Follow sent. Messaging unlocks when they approve.'
+                  : followState === 'incoming'
+                    ? 'They asked to follow you — approve to unlock messaging.'
+                    : 'Follow them first. After they approve, you can message.'}
             </Text>
           </View>
         ) : null}
@@ -245,6 +365,32 @@ export default function MemberAdminScreen() {
           <View style={styles.stat}>
             <Text style={styles.statValue}>{member.no_shows}</Text>
             <Text style={styles.statLabel}>No-shows</Text>
+          </View>
+        </View>
+
+        <View style={styles.missionsBlock}>
+          <Text style={styles.missionsTitle}>Missions</Text>
+          <Text style={styles.missionsSub}>
+            {medals.filter((m) => m.unlockedAt).length} unlocked
+          </Text>
+          <View style={styles.medalGrid}>
+            {medals.map((a) => {
+              const on = Boolean(a.unlockedAt);
+              return (
+                <View key={a.id} style={[styles.medalCell, !on && styles.medalLocked]}>
+                  <MedalBadge
+                    mark={a.mark}
+                    tier={a.tier}
+                    unlocked={on}
+                    size="md"
+                    achievementId={a.id}
+                  />
+                  <Text style={[styles.medalTitle, !on && styles.medalMuted]} numberOfLines={2}>
+                    {a.title}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -518,4 +664,46 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 15,
   },
+  missionsBlock: { gap: 8, marginTop: spacing.sm },
+  missionsTitle: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 16,
+    color: colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  missionsSub: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: -2,
+  },
+  medalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  medalCell: {
+    width: '30%',
+    flexGrow: 1,
+    minWidth: 96,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,46,0.3)',
+    alignItems: 'center',
+  },
+  medalLocked: {
+    borderColor: colors.borderSubtle,
+    opacity: 0.9,
+  },
+  medalTitle: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 11,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  medalMuted: { color: colors.textMuted },
 });

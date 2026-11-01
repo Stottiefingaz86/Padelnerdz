@@ -113,6 +113,6 @@ export async function getOwnerMetrics(): Promise<OwnerMetrics> {
     commissionGrossCents: commissionGross,
     recentPayments: ledger.slice(0, 20),
     note:
-      'Bizum / Revolut.me pay the organiser directly. This ledger tracks expected Padel Nerdz take (fee + IVA). Automatic collection needs Stripe Connect or monthly organiser invoices.',
+      'Stripe Connect destination charges: platform keeps fee+IVA (application_fee); organiser receives court share on their connected account.',
   };
 }

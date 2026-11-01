@@ -1,13 +1,17 @@
 import { colors } from '@padel-nerdz/config';
-import { SymbolView } from 'expo-symbols';
 import { Tabs, useFocusEffect } from 'expo-router';
+import { CircleUserRound, Compass, Inbox, MessageCircle } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 
+import { Icon } from '@/components/Icon';
+import { TennisRacket } from '@/components/icons/TennisRacket';
 import { useAuth } from '@/lib/auth';
 import { subscribeChat } from '@/lib/chat';
 import { totalUnreadForGroups } from '@/lib/chat-read';
+import { countInboxBadge } from '@/lib/dm';
 import { select } from '@/lib/feedback';
+import { listFriendRequests, subscribeFriends } from '@/lib/friends';
 import { listMyGroups } from '@/lib/groups';
 import { subscribeDemoStore } from '@/lib/demo-store';
 
@@ -15,12 +19,15 @@ export default function TabLayout() {
   const { profile, user, offline } = useAuth();
   const userId = user?.id ?? profile?.id ?? '';
   const [chatUnread, setChatUnread] = useState(0);
+  const [inboxUnread, setInboxUnread] = useState(0);
 
   const refreshBadges = useCallback(async () => {
     if (!userId) return;
     try {
       const groups = await listMyGroups(userId, offline);
       setChatUnread(await totalUnreadForGroups(groups.map((g) => g.id), userId));
+      const reqs = await listFriendRequests(offline);
+      setInboxUnread(await countInboxBadge(userId, offline, reqs.length));
     } catch {
       /* ignore badge failures */
     }
@@ -31,9 +38,11 @@ export default function TabLayout() {
       void refreshBadges();
       const a = subscribeDemoStore(() => void refreshBadges());
       const b = subscribeChat(() => void refreshBadges());
+      const c = subscribeFriends(() => void refreshBadges());
       return () => {
         a();
         b();
+        c();
       };
     }, [refreshBadges]),
   );
@@ -66,66 +75,44 @@ export default function TabLayout() {
           headerTitle: 'Chats',
           tabBarBadge: chatUnread > 0 ? chatUnread : undefined,
           tabBarBadgeStyle: styles.badge,
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'chat', web: 'chat' }}
-              tintColor={color}
-              size={24}
-              style={Platform.OS !== 'ios' ? { width: 24, height: 24 } : undefined}
-            />
-          ),
+          tabBarIcon: ({ color }) => <Icon icon={MessageCircle} color={color} size="lg" />,
         }}
       />
       <Tabs.Screen
         name="play"
         options={{
-          title: 'Play',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'tennisball.fill', android: 'sports_tennis', web: 'sports_tennis' }}
-              tintColor={color}
-              size={24}
-            />
-          ),
+          title: 'My Games',
+          tabBarIcon: ({ color }) => <Icon icon={TennisRacket} color={color} size="lg" />,
         }}
       />
       <Tabs.Screen
         name="discover"
         options={{
           title: 'Discover',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'safari.fill', android: 'explore', web: 'explore' }}
-              tintColor={color}
-              size={24}
-            />
-          ),
+          tabBarIcon: ({ color }) => <Icon icon={Compass} color={color} size="lg" />,
+        }}
+      />
+      <Tabs.Screen
+        name="inbox"
+        options={{
+          title: 'Inbox',
+          tabBarBadge: inboxUnread > 0 ? inboxUnread : undefined,
+          tabBarBadgeStyle: styles.badge,
+          tabBarIcon: ({ color }) => <Icon icon={Inbox} color={color} size="lg" />,
         }}
       />
       <Tabs.Screen
         name="shop"
         options={{
+          href: null,
           title: 'Shop',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'bag.fill', android: 'shopping_bag', web: 'shopping_bag' }}
-              tintColor={color}
-              size={24}
-            />
-          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'person.crop.circle.fill', android: 'person', web: 'person' }}
-              tintColor={color}
-              size={24}
-            />
-          ),
+          tabBarIcon: ({ color }) => <Icon icon={CircleUserRound} color={color} size="lg" />,
         }}
       />
     </Tabs>

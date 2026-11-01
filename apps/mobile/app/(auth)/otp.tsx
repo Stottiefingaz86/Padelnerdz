@@ -20,15 +20,21 @@ function isSmsUnsupported(message: string) {
   );
 }
 
+/** Solo device demos only — never on for real beta / friends. */
+function allowLocalPhoneFallback() {
+  return process.env.EXPO_PUBLIC_ALLOW_LOCAL_PHONE_FALLBACK === 'true';
+}
+
 export default function OtpScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
   const { signUpWithPhoneLocal, adoptSupabaseSession } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const localFallback = allowLocalPhoneFallback();
 
   async function useLocalInstead() {
-    if (!phone) return;
+    if (!phone || !localFallback) return;
     const account = await signUpWithPhoneLocal(phone);
     void success();
     router.replace(account.onboarding_completed ? '/(tabs)/chats' : '/(onboarding)/profile');
@@ -50,7 +56,7 @@ export default function OtpScreen() {
       });
       if (verifyError) {
         void warn();
-        if (isSmsUnsupported(verifyError.message)) {
+        if (localFallback && isSmsUnsupported(verifyError.message)) {
           await useLocalInstead();
           return;
         }
@@ -60,7 +66,6 @@ export default function OtpScreen() {
 
       const session = data.session;
       if (!session) {
-        // Rare: tokens in storage but no session object — pull once
         const { data: again } = await getSupabase().auth.getSession();
         if (!again.session) {
           setError('Signed in, but session didn’t stick. Try Verify again.');
@@ -76,7 +81,6 @@ export default function OtpScreen() {
 
       const profile = await adoptSupabaseSession(session);
       void success();
-      // Go straight to onboarding/chats — don’t bounce via `/` (race → auth again)
       router.replace(
         profile?.onboarding_completed ? '/(tabs)/chats' : '/(onboarding)/profile',
       );
@@ -93,7 +97,7 @@ export default function OtpScreen() {
       const { error: otpError } = await getSupabase().auth.signInWithOtp({ phone: phone! });
       if (otpError) {
         void warn();
-        if (isSmsUnsupported(otpError.message)) {
+        if (localFallback && isSmsUnsupported(otpError.message)) {
           await useLocalInstead();
           return;
         }
@@ -112,12 +116,14 @@ export default function OtpScreen() {
       footer={
         <>
           <AppButton label="Verify" onPress={verify} loading={loading} />
-          <AppButton
-            label="Continue without SMS"
-            variant="ghost"
-            onPress={() => void useLocalInstead()}
-            style={styles.ghost}
-          />
+          {localFallback ? (
+            <AppButton
+              label="Continue without SMS"
+              variant="ghost"
+              onPress={() => void useLocalInstead()}
+              style={styles.ghost}
+            />
+          ) : null}
         </>
       }
     >
@@ -134,9 +140,15 @@ export default function OtpScreen() {
         error={error}
       />
       <AppButton label="Resend SMS" variant="ghost" onPress={resend} />
-      <Text style={styles.hint}>
-        No SMS yet? Continue without SMS keeps this number as your account on this device.
-      </Text>
+      {localFallback ? (
+        <Text style={styles.hint}>
+          Demo only: Continue without SMS keeps this number as a device-local account.
+        </Text>
+      ) : (
+        <Text style={styles.hint}>
+          Didn’t get a code? Check the number, wait a moment, then tap Resend SMS.
+        </Text>
+      )}
     </AuthShell>
   );
 }

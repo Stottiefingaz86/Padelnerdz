@@ -53,8 +53,8 @@ export default function InboxFriendsScreen() {
     const mine = await getMyFriendTag(profile?.display_name ?? undefined);
     setMyTag(mine);
     const [f, r, threads] = await Promise.all([
-      listFriends(),
-      listFriendRequests(),
+      listFriends(isGuest),
+      listFriendRequests(isGuest),
       userId ? listMyDmThreads(userId, isGuest) : Promise.resolve([]),
     ]);
     setFriends(f);
@@ -71,13 +71,13 @@ export default function InboxFriendsScreen() {
   async function onAdd() {
     setError(undefined);
     try {
-      await addFriendByTag(addTag);
+      await addFriendByTag(addTag, isGuest);
       setAddTag('');
       void success();
       await refresh();
     } catch (e) {
       void warn();
-      setError(e instanceof Error ? e.message : 'Could not add friend');
+      setError(e instanceof Error ? e.message : 'Could not send follow request');
     }
   }
 
@@ -101,9 +101,9 @@ export default function InboxFriendsScreen() {
       const threadId = await openDmWithMember({
         peerId: friend.id,
         peerName: friend.display_name,
-        groupId: 'demo-inbox',
+        groupId: null,
         actorId: userId,
-        isGuest: true,
+        isGuest,
       });
       void success();
       router.push(`/dm/${threadId}`);
@@ -139,7 +139,7 @@ export default function InboxFriendsScreen() {
           <View style={styles.head}>
             {requests.length > 0 ? (
               <View style={styles.block}>
-                <Text style={styles.section}>Requests · {requests.length}</Text>
+                <Text style={styles.section}>Follow requests · {requests.length}</Text>
                 {requests.map((req) => (
                   <View key={req.id} style={styles.row}>
                     <Avatar name={req.from_name} size={44} />
@@ -151,22 +151,22 @@ export default function InboxFriendsScreen() {
                       style={styles.accept}
                       onPress={() => {
                         void tap();
-                        void acceptFriendRequest(req.id).then(() => {
+                        void acceptFriendRequest(req.id, isGuest).then(() => {
                           void success();
                           void refresh();
                         });
                       }}
                     >
-                      <Text style={styles.acceptText}>Confirm</Text>
+                      <Text style={styles.acceptText}>Approve</Text>
                     </Pressable>
                     <Pressable
                       style={styles.decline}
                       onPress={() => {
                         void tap();
-                        void declineFriendRequest(req.id).then(refresh);
+                        void declineFriendRequest(req.id, isGuest).then(refresh);
                       }}
                     >
-                      <Text style={styles.declineText}>Delete</Text>
+                      <Text style={styles.declineText}>Decline</Text>
                     </Pressable>
                   </View>
                 ))}
@@ -183,7 +183,7 @@ export default function InboxFriendsScreen() {
             </View>
 
             <TextField
-              label="Add friend by @tag"
+              label="Follow by @tag"
               value={addTag}
               onChangeText={setAddTag}
               autoCapitalize="none"
@@ -198,7 +198,7 @@ export default function InboxFriendsScreen() {
                 void onAdd();
               }}
             >
-              <Text style={styles.addText}>Add friend</Text>
+              <Text style={styles.addText}>Send follow</Text>
             </Pressable>
 
             <Text style={styles.section}>Friends</Text>
@@ -208,7 +208,7 @@ export default function InboxFriendsScreen() {
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No friends yet</Text>
             <Text style={styles.empty}>
-              Share your QR or @tag, then message them from Messages.
+              Share your QR or @tag. After they approve your follow, you can message.
             </Text>
           </View>
         }
@@ -234,7 +234,7 @@ export default function InboxFriendsScreen() {
             <Pressable
               onPress={() => {
                 void tap();
-                void removeFriend(item.id).then(refresh);
+                void removeFriend(item.id, isGuest).then(refresh);
               }}
             >
               <Text style={styles.remove}>Remove</Text>

@@ -18,7 +18,7 @@ export default async function AdminUsersPage() {
   const { users, note, error } = await getAdminUsers();
 
   return (
-    <main className="min-h-screen bg-[#0B0D10] px-6 py-10 text-white sm:px-10">
+    <main className="min-h-screen bg-[#0F1115] px-6 py-10 text-white sm:px-10">
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -82,7 +82,7 @@ export default async function AdminUsersPage() {
                             className="h-9 w-9 rounded-full object-cover bg-[#1A1A1A]"
                           />
                         ) : (
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C8FF2E] text-sm font-bold text-[#0B0D10]">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C8FF2E] text-sm font-bold text-[#0F1115]">
                             {u.initials}
                           </div>
                         )}

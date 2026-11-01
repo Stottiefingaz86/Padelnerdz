@@ -1,6 +1,6 @@
 import { colors, spacing } from '@padel-nerdz/config';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
@@ -17,12 +17,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AcceptNoticeCard } from '@/components/chat/AcceptNoticeCard';
+import { ChatWallpaper } from '@/components/chat/ChatWallpaper';
 import { MediaBubble } from '@/components/chat/MediaBubble';
+import { MessageReactions } from '@/components/chat/MessageReactions';
 import { HeaderBack } from '@/components/HeaderBack';
 import { MixinCard } from '@/components/chat/MixinCard';
 import { WrapCard } from '@/components/chat/WrapCard';
 import { FlatPlusIcon, FlatSendIcon } from '@/components/FlatIcons';
-import { SymbolView } from 'expo-symbols';
 import { useAuth } from '@/lib/auth';
 import {
   listGroupMessages,
@@ -30,11 +31,15 @@ import {
   subscribeChat,
   type ChatMessage,
 } from '@/lib/chat';
-import { getChannelPrefs, setChannelPrefs } from '@/lib/channel-prefs';
 import { chatAlert, messageSent, revolutPulse, success, tap, warn } from '@/lib/feedback';
 import { canOrganiseGroup, getGroup, listGroupMembers } from '@/lib/groups';
 import { useGlassHeaderOffset } from '@/lib/layout';
 import {
+  listChannelReactions,
+  type MessageReactionMap,
+} from '@/lib/reactions';
+import {
+  ensurePaidSessionRoomAccess,
   getSession,
   listRegistrants,
   registerForSession,
@@ -44,7 +49,7 @@ import {
 } from '@/lib/sessions';
 
 export default function GroupChatScreen() {
-  const headerOffset = useGlassHeaderOffset(12);
+  const headerOffset = useGlassHeaderOffset(20);
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { profile, user , offline } = useAuth();
@@ -64,7 +69,7 @@ export default function GroupChatScreen() {
   const [myStates, setMyStates] = useState<Record<string, MyRegistrationState>>({});
   const [lineupConfirmed, setLineupConfirmed] = useState<Record<string, boolean>>({});
   const [sessionMeta, setSessionMeta] = useState<Record<string, SessionSummary>>({});
-  const [muted, setMuted] = useState(false);
+  const [reactions, setReactions] = useState<MessageReactionMap>({});
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const lastAlertId = useRef<string | null>(null);
   const myStatesRef = useRef(myStates);
@@ -76,12 +81,19 @@ export default function GroupChatScreen() {
 
   const refresh = useCallback(async () => {
     if (!id || !userId) return;
-    const [msgs, group, people] = await Promise.all([
+    const [msgs, group, people, reactionMap] = await Promise.all([
       listGroupMessages(id, userId, isGuest),
       getGroup(id, userId, isGuest),
       listGroupMembers(id, userId, isGuest),
+      listChannelReactions({
+        channelType: 'group',
+        channelId: id,
+        userId,
+        isGuest,
+      }).catch(() => ({}) as MessageReactionMap),
     ]);
     setMessages(msgs);
+    setReactions(reactionMap);
     setMemberCount(Math.max(people.length, group?.member_count ?? 0));
     setMemberPreview(
       people
@@ -113,7 +125,12 @@ export default function GroupChatScreen() {
         const session = await getSession(sessionId, isGuest);
         const regs = await listRegistrants(sessionId, id, isGuest);
         states[sessionId] = registrationStateForUser(regs, userId);
-        confirmed[sessionId] = regs.some((r) => r.status === 'selected' || r.status === 'paid');
+        // payment_claimed still means lineup was set — don't flip the card back to "Confirm lineup"
+        confirmed[sessionId] = regs.some((r) =>
+          r.status === 'selected' ||
+          r.status === 'payment_claimed' ||
+          r.status === 'paid',
+        );
         if (session) {
           meta[sessionId] = {
             ...session,
@@ -150,10 +167,11 @@ export default function GroupChatScreen() {
     }
   }, [id, userId, isGuest]);
 
-  useEffect(() => {
-    if (!id) return;
-    void getChannelPrefs(id).then((p) => setMuted(p.muted));
-  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh]),
+  );
 
   useEffect(() => {
     void refresh();
@@ -161,13 +179,6 @@ export default function GroupChatScreen() {
       void refresh();
     });
   }, [refresh]);
-
-  async function toggleMute() {
-    if (!id) return;
-    void tap();
-    const next = await setChannelPrefs(id, { muted: !muted, sounds: muted });
-    setMuted(next.muted);
-  }
 
   async function onSend() {
     if (!id || !userId || !draft.trim() || sending) return;
@@ -245,6 +256,39 @@ export default function GroupChatScreen() {
   function onPay(sessionId: string) {
     void tap();
     router.push(`/group/${id}/pay/${sessionId}`);
+  }
+
+  async function openSessionChat(sessionId: string) {
+    if (!id || !userId) return;
+    void tap();
+    try {
+      let roomId =
+        sessionMetaRef.current[sessionId]?.session_room_id ??
+        (await getSession(sessionId, isGuest))?.session_room_id ??
+        null;
+      if (!roomId) {
+        roomId = await ensurePaidSessionRoomAccess({
+          sessionId,
+          userId,
+          isGuest,
+        });
+      } else {
+        await ensurePaidSessionRoomAccess({ sessionId, userId, isGuest });
+      }
+      if (roomId) {
+        router.push(`/group/${id}/session-room/${roomId}`);
+        return;
+      }
+      Alert.alert(
+        'Session chat',
+        'Session chat unlocks once your payment is confirmed by the organiser.',
+      );
+    } catch (e) {
+      Alert.alert(
+        'Session chat',
+        e instanceof Error ? e.message : 'Could not open session chat.',
+      );
+    }
   }
 
   async function pickAndSendMedia(video: boolean) {
@@ -375,30 +419,18 @@ export default function GroupChatScreen() {
             </Pressable>
           ),
           headerRight: () => (
-            <View style={styles.headerRightRow}>
-              <Pressable onPress={() => void toggleMute()} hitSlop={10} style={styles.muteBtn}>
-                <SymbolView
-                  name={{
-                    ios: muted ? 'speaker.slash.fill' : 'speaker.wave.2.fill',
-                    android: muted ? 'volume_off' : 'volume_up',
-                    web: muted ? 'volume_off' : 'volume_up',
-                  }}
-                  tintColor={muted ? colors.textMuted : colors.textPrimary}
-                  size={20}
-                  style={Platform.OS !== 'ios' ? { width: 20, height: 20 } : undefined}
-                />
-              </Pressable>
-              <Pressable
-                onPress={openGroupInfo}
-                hitSlop={10}
-                style={styles.headerAvatarBtn}
-                android_ripple={{ color: 'transparent' }}
-              >
-                <View style={styles.headerAvatar}>
-                  <Text style={styles.headerAvatarText}>{title.slice(0, 1).toUpperCase()}</Text>
-                </View>
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={openGroupInfo}
+              hitSlop={10}
+              style={styles.headerAvatarBtn}
+              android_ripple={{ color: 'transparent' }}
+              accessibilityRole="button"
+              accessibilityLabel="Group info"
+            >
+              <View style={styles.headerAvatar}>
+                <Text style={styles.headerAvatarText}>{title.slice(0, 1).toUpperCase()}</Text>
+              </View>
+            </Pressable>
           ),
         }}
       />
@@ -407,9 +439,11 @@ export default function GroupChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
+        <ChatWallpaper>
         <FlatList
           ref={listRef}
           data={data}
+          style={styles.listFlex}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.list, { paddingTop: headerOffset }]}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
@@ -442,12 +476,23 @@ export default function GroupChatScreen() {
             }
 
             if (item.kind === 'wrap_card') {
+              const wrapSessionId = String(item.payload.session_id ?? '');
               return (
                 <WrapCard
                   title={String(item.payload.title ?? item.body)}
-                  subtitle="Session closed · wrap is in the group feed"
+                  subtitle="Tap to play the session wrap"
                   mediaUrl={(item.payload.media_url as string | null) ?? null}
                   playerCount={Number(item.payload.player_count ?? 0) || undefined}
+                  photoCount={Number(item.payload.photo_count ?? 0) || undefined}
+                  matchCount={Number(item.payload.match_count ?? 0) || undefined}
+                  onOpen={
+                    wrapSessionId
+                      ? () => {
+                          void tap();
+                          router.push(`/group/${id}/wrap/${wrapSessionId}`);
+                        }
+                      : undefined
+                  }
                 />
               );
             }
@@ -490,41 +535,60 @@ export default function GroupChatScreen() {
                   onRegister={() => void onRegister(sessionId)}
                   onPay={() => onPay(sessionId)}
                   onSelectPlayers={() => router.push(`/group/${id}/select/${sessionId}`)}
-                  onViewDetails={() => router.push(`/group/${id}/session/${sessionId}`)}
-                  onOpenSessionRoom={() => {
-                    if (session?.session_room_id) {
-                      router.push(`/group/${id}/session-room/${session.session_room_id}`);
-                    }
-                  }}
+                  onOpenSessionRoom={() => void openSessionChat(sessionId)}
                 />
               );
             }
 
             if (item.kind === 'image' || item.kind === 'video') {
               return (
-                <MediaBubble
-                  path={
-                    item.payload.path ? String(item.payload.path) : null
-                  }
-                  uri={String(item.payload.uri ?? '')}
-                  kind={item.kind}
-                  sender={item.sender_name}
-                  mine={item.mine}
-                  createdAt={item.created_at}
-                />
+                <View>
+                  <MediaBubble
+                    path={
+                      item.payload.path ? String(item.payload.path) : null
+                    }
+                    uri={String(item.payload.uri ?? '')}
+                    kind={item.kind}
+                    sender={item.sender_name}
+                    mine={item.mine}
+                    createdAt={item.created_at}
+                  />
+                  <MessageReactions
+                    messageId={item.id}
+                    channelType="group"
+                    channelId={id!}
+                    userId={userId}
+                    isGuest={isGuest}
+                    reactions={reactions[item.id]}
+                    align={item.mine ? 'right' : 'left'}
+                    onChanged={setReactions}
+                  />
+                </View>
               );
             }
 
             return (
-              <View style={[styles.bubble, item.mine ? styles.mine : styles.theirs]}>
-                {!item.mine ? <Text style={styles.sender}>{item.sender_name}</Text> : null}
-                <Text style={styles.body}>{item.body}</Text>
-                <Text style={styles.time}>
-                  {new Date(item.created_at).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
+              <View>
+                <View style={[styles.bubble, item.mine ? styles.mine : styles.theirs]}>
+                  {!item.mine ? <Text style={styles.sender}>{item.sender_name}</Text> : null}
+                  <Text style={styles.body}>{item.body}</Text>
+                  <Text style={styles.time}>
+                    {new Date(item.created_at).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+                <MessageReactions
+                  messageId={item.id}
+                  channelType="group"
+                  channelId={id!}
+                  userId={userId}
+                  isGuest={isGuest}
+                  reactions={reactions[item.id]}
+                  align={item.mine ? 'right' : 'left'}
+                  onChanged={setReactions}
+                />
               </View>
             );
           }}
@@ -560,6 +624,7 @@ export default function GroupChatScreen() {
             <FlatSendIcon />
           </Pressable>
         </View>
+        </ChatWallpaper>
       </KeyboardAvoidingView>
     </>
   );
@@ -567,6 +632,7 @@ export default function GroupChatScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  listFlex: { flex: 1, backgroundColor: 'transparent' },
   headerTitleBtn: {
     maxWidth: 180,
     alignItems: Platform.OS === 'ios' ? 'center' : 'flex-start',

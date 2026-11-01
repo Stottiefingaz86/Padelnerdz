@@ -1,32 +1,42 @@
 import { colors, radii, spacing } from '@padel-nerdz/config';
+import * as ImagePicker from 'expo-image-picker';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ChevronRight, Ellipsis } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HeaderBack } from '@/components/HeaderBack';
+import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
 import { select, success, tap, warn } from '@/lib/feedback';
 import { useGlassHeaderOffset } from '@/lib/layout';
 import {
   canOrganiseGroup,
+  deleteGroup,
   getGroup,
   levelLabel,
   listGroupMembers,
   listPendingJoinRequests,
   resolveJoinRequest,
+  updateGroup,
   type GroupMember,
   type GroupSummary,
   type JoinRequest,
 } from '@/lib/groups';
+import { resolveMediaDisplayUrl, uploadGroupImage } from '@/lib/media';
 import {
   closeSession,
   listGroupSessions,
@@ -55,6 +65,8 @@ export default function GroupAdminScreen() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [registeringId, setRegisteringId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingMedia, setSavingMedia] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
@@ -66,7 +78,19 @@ export default function GroupAdminScreen() {
         listGroupSessions(id, isGuest),
         listPendingJoinRequests(id).catch(() => [] as JoinRequest[]),
       ]);
-      setGroup(g);
+      if (g) {
+        const [avatar, cover] = await Promise.all([
+          resolveMediaDisplayUrl(g.avatar_url),
+          resolveMediaDisplayUrl(g.cover_url),
+        ]);
+        setGroup({
+          ...g,
+          avatar_url: avatar ?? g.avatar_url,
+          cover_url: cover ?? g.cover_url,
+        });
+      } else {
+        setGroup(g);
+      }
       setMembers(people);
       setSessions(upcoming);
       setJoinRequests(requests);
@@ -81,19 +105,20 @@ export default function GroupAdminScreen() {
         upcoming.map(async (session) => {
           try {
             const list = await listRegistrants(session.id, id, isGuest);
-            const interested = list.filter(
-              (r) =>
-                r.status === 'registered' ||
-                r.status === 'selected' ||
-                r.status === 'waitlist' ||
-                r.status === 'payment_claimed' ||
-                r.status === 'paid',
-            );
-            nextRegs[session.id] = interested;
+            // Show everyone still in the mix-in (not cancelled)
+            nextRegs[session.id] = list.filter((r) => r.status !== 'cancelled');
             nextSelected[session.id] = new Set(
-              list.filter((r) => r.status === 'selected' || r.status === 'paid' || r.status === 'payment_claimed').map((r) => r.user_id),
+              list
+                .filter(
+                  (r) =>
+                    r.status === 'selected' ||
+                    r.status === 'paid' ||
+                    r.status === 'payment_claimed',
+                )
+                .map((r) => r.user_id),
             );
-          } catch {
+          } catch (e) {
+            console.warn('Admin listRegistrants failed', session.id, e);
             nextRegs[session.id] = [];
             nextSelected[session.id] = new Set();
           }
@@ -132,6 +157,27 @@ export default function GroupAdminScreen() {
       Alert.alert('Select players', 'Tap players below, then confirm the lineup.');
       return;
     }
+    if (!isGuest && (session.price_cents ?? 0) > 0) {
+      try {
+        const { getGroupPaymentSettings, isStripePayoutReady } = await import(
+          '@/lib/payments'
+        );
+        const pay = await getGroupPaymentSettings(id, isGuest);
+        if (!isStripePayoutReady(pay)) {
+          Alert.alert(
+            'Connect bank first',
+            'Paid lineups need Stripe so players can pay in-app and you receive the court share automatically.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Payments', onPress: () => router.push(`/group/${id}/payments`) },
+            ],
+          );
+          return;
+        }
+      } catch {
+        // continue if settings unavailable
+      }
+    }
     setConfirmingId(session.id);
     try {
       await selectPlayersForSession({
@@ -157,6 +203,182 @@ export default function GroupAdminScreen() {
     } finally {
       setConfirmingId(null);
     }
+  }
+
+  function openMixinMore(session: SessionSummary, regs: Registrant[], lineupDone: boolean) {
+    const options: string[] = [];
+    if (!lineupDone && !regs.some((r) => r.user_id === userId)) options.push('I want to play');
+    if (!lineupDone) options.push('Full lineup screen');
+    if (session.session_room_id) {
+      options.push('Fixtures', 'Scan tickets');
+    }
+    if (session.status === 'closed') options.push('Open wrap');
+    else options.push('Close mix-in');
+    options.push('Cancel');
+    const cancelButtonIndex = options.length - 1;
+
+    const run = (label: string) => {
+      if (label === 'I want to play') {
+        void registerMyself(session);
+        return;
+      }
+      if (label === 'Full lineup screen') {
+        router.push(`/group/${id}/select/${session.id}`);
+        return;
+      }
+      if (label === 'Fixtures') {
+        router.push(`/group/${id}/fixtures/${session.id}`);
+        return;
+      }
+      if (label === 'Scan tickets') {
+        router.push(`/group/${id}/check-in/${session.id}`);
+        return;
+      }
+      if (label === 'Open wrap') {
+        router.push(`/group/${id}/wrap/${session.id}`);
+        return;
+      }
+      if (label === 'Close mix-in') {
+        Alert.alert('Close mix-in?', 'Posts the wrap and locks session chat.', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Close',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  await closeSession({
+                    sessionId: session.id,
+                    groupId: id!,
+                    organiserId: userId,
+                    isGuest,
+                  });
+                  void success();
+                  await load();
+                  router.push(`/group/${id}/wrap/${session.id}`);
+                } catch {
+                  void warn();
+                }
+              })();
+            },
+          },
+        ]);
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+          destructiveButtonIndex: options.indexOf('Close mix-in'),
+        },
+        (i) => {
+          const label = options[i];
+          if (!label || label === 'Cancel') return;
+          void select();
+          run(label);
+        },
+      );
+      return;
+    }
+
+    Alert.alert(
+      session.title,
+      undefined,
+      [
+        ...options
+          .filter((o) => o !== 'Cancel')
+          .map((label) => ({
+            text: label,
+            style: (label === 'Close mix-in' ? 'destructive' : 'default') as
+              | 'destructive'
+              | 'default',
+            onPress: () => run(label),
+          })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+    );
+  }
+
+  async function pickGroupImage(kind: 'banner' | 'avatar') {
+    if (!id || !userId) return;
+    void tap();
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Photos', 'Allow photo access to update the group image.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      allowsEditing: kind === 'avatar',
+      aspect: kind === 'avatar' ? [1, 1] : undefined,
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    const localUri = result.assets[0].uri;
+    setSavingMedia(true);
+    try {
+      const uploaded = await uploadGroupImage({
+        userId,
+        groupId: id,
+        localUri,
+        kind: kind === 'banner' ? 'cover' : 'avatar',
+        mimeType: result.assets[0].mimeType,
+      });
+      // Persist storage path (or local uri in demo); resolve signed URL for display.
+      const next = await updateGroup(id, userId, isGuest, {
+        cover_url: kind === 'banner' ? uploaded.path : group?.cover_url,
+        avatar_url: kind === 'avatar' ? uploaded.path : group?.avatar_url,
+      });
+      const display =
+        (await resolveMediaDisplayUrl(kind === 'banner' ? next.cover_url : next.avatar_url)) ||
+        uploaded.signedUrl;
+      setGroup({
+        ...next,
+        cover_url: kind === 'banner' ? display : next.cover_url,
+        avatar_url: kind === 'avatar' ? display : next.avatar_url,
+      });
+      void success();
+    } catch (e) {
+      void warn();
+      Alert.alert('Couldn’t update', e instanceof Error ? e.message : 'Try again');
+    } finally {
+      setSavingMedia(false);
+    }
+  }
+
+  function confirmDeleteGroup() {
+    if (!id || !userId || !group) return;
+    Alert.alert(
+      'Delete group?',
+      `This permanently removes “${group.name}”, chats, and mix-ins. This can’t be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete group',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setDeleting(true);
+              try {
+                await deleteGroup(id, userId, isGuest);
+                void success();
+                router.replace('/(tabs)/chats');
+              } catch (e) {
+                void warn();
+                Alert.alert(
+                  'Couldn’t delete',
+                  e instanceof Error ? e.message : 'Try again',
+                );
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
   }
 
   async function registerMyself(session: SessionSummary) {
@@ -211,161 +433,208 @@ export default function GroupAdminScreen() {
     );
   }
 
+  const dockPad = 72 + Math.max(insets.bottom, 12);
+
   return (
     <>
-      <Stack.Screen options={{ title: 'Admin', headerBackTitle: 'Group' }} />
+      <Stack.Screen
+        options={{
+          title: 'Admin',
+          headerBackTitle: 'Group',
+          headerBackVisible: false,
+          headerLeft: () => <HeaderBack fallbackHref={id ? `/group/${id}` : undefined} />,
+        }}
+      />
+      <View style={styles.root}>
       <FlatList
-        style={styles.root}
+        style={styles.list}
         data={members}
         keyExtractor={(item) => item.user_id}
         contentContainerStyle={{
           paddingTop: headerOffset,
-          paddingBottom: insets.bottom + 32,
+          paddingBottom: dockPad + 24,
         }}
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={styles.banner}>
-              {group?.cover_url ? (
-                <Image source={{ uri: group.cover_url }} style={styles.cover} />
-              ) : (
-                <View style={styles.coverPlaceholder}>
-                  <Text style={styles.coverLetter}>
-                    {(group?.name ?? 'G').slice(0, 1).toUpperCase()}
+            <View style={styles.identity}>
+              <Pressable
+                style={styles.bannerTap}
+                onPress={() => void pickGroupImage('banner')}
+                disabled={savingMedia}
+              >
+                {group?.cover_url ? (
+                  <Image source={{ uri: group.cover_url }} style={styles.cover} />
+                ) : (
+                  <View style={styles.coverPlaceholder}>
+                    <Text style={styles.coverHint}>Tap to set banner</Text>
+                  </View>
+                )}
+                <View style={styles.bannerEditChip}>
+                  <Text style={styles.bannerEditText}>
+                    {savingMedia ? 'Saving…' : 'Change banner'}
                   </Text>
                 </View>
-              )}
-              <Text style={styles.bannerTitle}>{group?.name}</Text>
-              <Text style={styles.bannerMeta}>
-                {members.length} members ·{' '}
-                {group?.members_can_post ? 'Anyone can post' : 'Admins only can post'}
-              </Text>
+              </Pressable>
+
+              <View style={styles.identityRow}>
+                <Pressable
+                  onPress={() => void pickGroupImage('avatar')}
+                  disabled={savingMedia}
+                  style={styles.avatarTap}
+                >
+                  {group?.avatar_url || group?.cover_url ? (
+                    <Image
+                      source={{ uri: group.avatar_url || group.cover_url! }}
+                      style={styles.groupAvatar}
+                    />
+                  ) : (
+                    <View style={styles.groupAvatarFallback}>
+                      <Text style={styles.coverLetter}>
+                        {(group?.name ?? 'G').slice(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.avatarEdit}>Change photo</Text>
+                </Pressable>
+                <View style={styles.identityCopy}>
+                  <Text style={styles.bannerTitle}>{group?.name}</Text>
+                  <Text style={styles.bannerMeta}>{members.length} members</Text>
+                </View>
+              </View>
             </View>
 
-            <View style={styles.quick}>
-              <Pressable
-                style={styles.primary}
-                onPress={() => {
-                  void tap();
-                  router.push(`/group/${id}/create-mixin`);
-                }}
-              >
-                <Text style={styles.primaryText}>Create mix-in</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondary}
-                onPress={() => router.push(`/group/${id}/payments`)}
-              >
-                <Text style={styles.secondaryText}>Payments</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondary}
-                onPress={() => router.push(`/group/${id}/settings`)}
-              >
-                <Text style={styles.secondaryText}>Settings</Text>
-              </Pressable>
-            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.menuCarousel}
+            >
+              {(
+                [
+                  { label: 'Payments', href: `/group/${id}/payments` },
+                  { label: 'Settings', href: `/group/${id}/settings` },
+                  { label: 'Leaderboard', href: `/group/${id}/leaderboard` },
+                  { label: 'Invite', href: `/group/${id}/invite` },
+                ] as const
+              ).map((item) => (
+                <Pressable
+                  key={item.label}
+                  style={styles.navChip}
+                  onPress={() => {
+                    void tap();
+                    router.push(item.href);
+                  }}
+                >
+                  <Text style={styles.navChipText}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
 
-            <Text style={styles.section}>Your mix-ins · lineup control</Text>
-            <Text style={styles.sectionHelp}>
-              See who’s registered, tap who should play, then confirm. Full control lives here — not
-              only in chat.
-            </Text>
+            <Text style={styles.section}>Mix-ins</Text>
 
             {sessions.length === 0 ? (
-              <Text style={styles.empty}>No mix-ins yet. Create one above.</Text>
+              <Text style={styles.empty}>No mix-ins yet.</Text>
             ) : (
               sessions.map((session) => {
                 const regs = regsBySession[session.id] ?? [];
                 const selected = selectedBySession[session.id] ?? new Set();
-                const lineupDone = Boolean(session.session_room_id) || session.status === 'selected';
+                const hasLineupPicks = regs.some(
+                  (r) =>
+                    r.status === 'selected' ||
+                    r.status === 'payment_claimed' ||
+                    r.status === 'paid',
+                );
+                const lineupDone =
+                  Boolean(session.session_room_id) ||
+                  session.status === 'selected' ||
+                  hasLineupPicks;
                 const status =
                   session.status === 'closed'
                     ? 'Closed'
                     : session.session_room_id
-                      ? 'Session open'
-                      : session.status === 'selected'
-                        ? 'Awaiting payments'
-                        : 'Collecting interest';
+                      ? 'Live'
+                      : lineupDone
+                        ? 'Awaiting pay'
+                        : 'Interest';
                 const confirming = confirmingId === session.id;
+                const showPicker = !lineupDone && regs.length > 0;
 
                 return (
                   <View key={session.id} style={styles.mixinCard}>
-                    <Text style={styles.cardTitle}>{session.title}</Text>
-                    <Text style={styles.cardMeta}>
-                      {new Date(session.starts_at).toLocaleString([], {
-                        weekday: 'short',
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {' · '}
-                      {regs.length}/{session.max_players} registered · {status}
-                    </Text>
+                    <View style={styles.cardTop}>
+                      <View style={styles.cardCopy}>
+                        <View style={styles.cardTitleRow}>
+                          <Text style={styles.cardTitle} numberOfLines={1}>
+                            {session.title}
+                          </Text>
+                          <View
+                            style={[
+                              styles.statusPill,
+                              session.status === 'closed' && styles.statusPillMuted,
+                              session.session_room_id &&
+                                session.status !== 'closed' &&
+                                styles.statusPillLive,
+                            ]}
+                          >
+                            <Text style={styles.statusPillText}>{status}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.cardMeta}>
+                          {new Date(session.starts_at).toLocaleString([], {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                          {' · '}
+                          {regs.length}/{session.max_players} interested
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={styles.moreBtn}
+                        onPress={() => {
+                          void tap();
+                          openMixinMore(session, regs, lineupDone);
+                        }}
+                        hitSlop={8}
+                        accessibilityLabel="More mix-in actions"
+                      >
+                        <Icon icon={Ellipsis} color={colors.textSecondary} size="sm" />
+                      </Pressable>
+                    </View>
 
-                    {regs.length === 0 ? (
-                      <Text style={styles.emptyRegs}>
-                        Nobody registered yet. Tap “I want to play” if you’re joining this mix-in.
-                      </Text>
-                    ) : (
+                    {showPicker ? (
                       <View style={styles.regList}>
-                        {regs.map((reg) => {
+                        {regs.slice(0, 6).map((reg) => {
                           const on = selected.has(reg.user_id);
-                          const locked = lineupDone;
                           return (
                             <Pressable
                               key={reg.id}
-                              disabled={locked}
                               onPress={() =>
                                 togglePlayer(session.id, reg.user_id, session.max_players)
                               }
-                              style={[styles.regRow, on && styles.regRowOn, locked && styles.regLocked]}
+                              style={[styles.regRow, on && styles.regRowOn]}
                             >
                               <View style={[styles.check, on && styles.checkOn]}>
                                 {on ? <Text style={styles.checkMark}>✓</Text> : null}
                               </View>
-                              <View style={styles.regCopy}>
-                                <Text style={styles.regName}>
-                                  {reg.display_name}
-                                  {reg.user_id === userId ? ' (You)' : ''}
-                                </Text>
-                                <Text style={styles.regMeta}>
-                                  {reg.status.replace('_', ' ')}
-                                  {reg.reliability > 0 ? ` · ${reg.reliability}%` : ' · new'}
-                                </Text>
-                              </View>
+                              <Text style={styles.regName} numberOfLines={1}>
+                                {reg.display_name}
+                                {reg.user_id === userId ? ' (You)' : ''}
+                              </Text>
                             </Pressable>
                           );
                         })}
+                        {regs.length > 6 ? (
+                          <Text style={styles.emptyRegs}>+{regs.length - 6} more · use ⋯</Text>
+                        ) : null}
                       </View>
-                    )}
-
-                    {!lineupDone && !regs.some((r) => r.user_id === userId) ? (
-                      <Pressable
-                        style={[
-                          styles.playBtn,
-                          registeringId === session.id && styles.confirmDisabled,
-                        ]}
-                        disabled={registeringId === session.id}
-                        onPress={() => {
-                          void tap();
-                          void registerMyself(session);
-                        }}
-                      >
-                        <Text style={styles.playBtnText}>
-                          {registeringId === session.id ? 'Registering…' : 'I want to play'}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-
-                    {!lineupDone && regs.some((r) => r.user_id === userId) ? (
-                      <Text style={styles.youIn}>You’re registered to play this mix-in.</Text>
                     ) : null}
 
                     {!lineupDone ? (
                       <Pressable
                         style={[
-                          styles.confirmBtn,
+                          styles.primaryBtn,
                           (confirming || selected.size === 0) && styles.confirmDisabled,
                         ]}
                         disabled={confirming || selected.size === 0}
@@ -374,79 +643,39 @@ export default function GroupAdminScreen() {
                           void confirmLineup(session);
                         }}
                       >
-                        <Text style={styles.confirmText}>
+                        <Text style={styles.primaryBtnText}>
                           {confirming
                             ? 'Confirming…'
-                            : `Confirm lineup · ${selected.size}/${session.max_players}`}
+                            : selected.size === 0
+                              ? 'Select players above'
+                              : `Confirm lineup · ${selected.size}`}
                         </Text>
                       </Pressable>
-                    ) : null}
-
-                    <View style={styles.cardActions}>
-                      {!session.session_room_id && session.status !== 'closed' ? (
-                        <Pressable
-                          onPress={() => {
-                            void select();
-                            router.push(`/group/${id}/select/${session.id}`);
-                          }}
-                        >
-                          <Text style={styles.link}>Full screen select</Text>
-                        </Pressable>
-                      ) : null}
-                      {session.status === 'selected' || session.session_room_id ? (
-                        <Pressable
-                          onPress={() => {
-                            void select();
-                            router.push(`/group/${id}/verify-payments/${session.id}`);
-                          }}
-                        >
-                          <Text style={styles.link}>Verify payments</Text>
-                        </Pressable>
-                      ) : null}
-                      {session.session_room_id ? (
-                        <Pressable
-                          onPress={() =>
-                            router.push(`/group/${id}/session-room/${session.session_room_id}`)
-                          }
-                        >
-                          <Text style={styles.link}>Open session</Text>
-                        </Pressable>
-                      ) : null}
-                      {session.session_room_id ? (
-                        <Pressable
-                          onPress={() => {
-                            void select();
-                            router.push(`/group/${id}/fixtures/${session.id}`);
-                          }}
-                        >
-                          <Text style={styles.link}>Fixtures</Text>
-                        </Pressable>
-                      ) : null}
-                      {session.status !== 'closed' ? (
-                        <Pressable
-                          onPress={() => {
-                            void select();
-                            void (async () => {
-                              try {
-                                await closeSession({
-                                  sessionId: session.id,
-                                  groupId: id!,
-                                  organiserId: userId,
-                                  isGuest,
-                                });
-                                void success();
-                                await load();
-                                router.push(`/group/${id}/chat`);
-                              } catch {
-                                void warn();
-                              }
-                            })();
-                          }}
-                        >
-                          <Text style={styles.linkDanger}>Close + wrap</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
+                    ) : session.status === 'closed' ? (
+                      <Pressable
+                        style={styles.secondaryBtn}
+                        onPress={() => {
+                          void select();
+                          router.push(`/group/${id}/wrap/${session.id}`);
+                        }}
+                      >
+                        <Text style={styles.secondaryBtnText}>Open wrap</Text>
+                      </Pressable>
+                    ) : session.session_room_id ? (
+                      <Pressable
+                        style={styles.secondaryBtn}
+                        onPress={() => {
+                          void select();
+                          router.push(`/group/${id}/session-room/${session.session_room_id}`);
+                        }}
+                      >
+                        <Text style={styles.secondaryBtnText}>Open session chat</Text>
+                      </Pressable>
+                    ) : (
+                      <View style={styles.awaitingPill}>
+                        <Text style={styles.awaitingText}>Waiting for payments</Text>
+                      </View>
+                    )}
                   </View>
                 );
               })
@@ -461,6 +690,7 @@ export default function GroupAdminScreen() {
                     <Text style={styles.cardMeta}>Wants to join this group</Text>
                     <View style={styles.rowActions}>
                       <Pressable
+                        style={styles.navBtn}
                         onPress={() => {
                           void (async () => {
                             try {
@@ -484,9 +714,10 @@ export default function GroupAdminScreen() {
                           })();
                         }}
                       >
-                        <Text style={styles.link}>Approve</Text>
+                        <Text style={styles.navBtnText}>Approve</Text>
                       </Pressable>
                       <Pressable
+                        style={[styles.actionChip, styles.actionChipDanger]}
                         onPress={() => {
                           void (async () => {
                             try {
@@ -505,7 +736,7 @@ export default function GroupAdminScreen() {
                           })();
                         }}
                       >
-                        <Text style={styles.linkDanger}>Reject</Text>
+                        <Text style={styles.actionChipTextDanger}>Reject</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -513,12 +744,24 @@ export default function GroupAdminScreen() {
               </View>
             ) : null}
 
-            <View style={styles.membersHead}>
-              <Text style={styles.section}>Members · reliability</Text>
-              <Pressable onPress={() => router.push(`/group/${id}/invite`)}>
-                <Text style={styles.link}>Invite</Text>
-              </Pressable>
-            </View>
+            <Text style={styles.section}>Members</Text>
+          </View>
+        }
+        ListFooterComponent={
+          <View style={styles.dangerZone}>
+            <Text style={styles.section}>Danger zone</Text>
+            <Pressable
+              style={[styles.deleteBtn, deleting && { opacity: 0.5 }]}
+              disabled={deleting}
+              onPress={confirmDeleteGroup}
+            >
+              <Text style={styles.deleteBtnText}>
+                {deleting ? 'Deleting…' : 'Delete group'}
+              </Text>
+            </Pressable>
+            <Text style={styles.deleteHint}>
+              Removes the group for everyone. Mix-ins and chat history are deleted.
+            </Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -541,26 +784,37 @@ export default function GroupAdminScreen() {
                 </Text>
                 <Text style={styles.meta}>
                   {levelLabel(item.organiser_level)} ·{' '}
-                  {item.reliability == null ? 'new' : `${item.reliability}% reliable`} ·{' '}
+                  {item.reliability == null ? 'new' : `${item.reliability}%`} ·{' '}
                   {item.sessions_played} played
                 </Text>
-                {item.notes ? (
-                  <Text style={styles.note} numberOfLines={1}>
-                    Note · {item.notes}
-                  </Text>
-                ) : null}
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <Icon icon={ChevronRight} color={colors.textMuted} size="sm" strokeWidth={2.25} />
             </Pressable>
           );
         }}
       />
+
+      <View style={[styles.createDock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <Pressable
+          style={styles.createMixinBtn}
+          onPress={() => {
+            void tap();
+            if (id) router.push(`/group/${id}/create-mixin`);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Create mix-in"
+        >
+          <Text style={styles.createMixinBtnText}>Create mix-in</Text>
+        </Pressable>
+      </View>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  list: { flex: 1 },
   center: {
     flex: 1,
     backgroundColor: colors.background,
@@ -568,26 +822,72 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: { padding: spacing.md, gap: spacing.md },
-  banner: { gap: 6 },
+  identity: { gap: 12 },
+  bannerTap: { position: 'relative' },
   cover: {
     width: '100%',
-    height: 120,
+    height: 132,
     borderRadius: 14,
     backgroundColor: colors.elevated,
   },
   coverPlaceholder: {
     width: '100%',
-    height: 120,
+    height: 132,
     borderRadius: 14,
     backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  coverHint: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 14,
+    color: colors.textMuted,
+  },
+  bannerEditChip: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(11,13,16,0.78)',
+  },
+  bannerEditText: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 12,
+    color: colors.textPrimary,
+  },
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatarTap: { alignItems: 'center', gap: 4 },
+  groupAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.elevated,
+  },
+  groupAvatarFallback: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.elevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
   coverLetter: {
     fontFamily: 'Figtree_700Bold',
-    fontSize: 42,
-    color: colors.accentGreen,
+    fontSize: 24,
+    color: colors.textPrimary,
   },
+  avatarEdit: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  identityCopy: { flex: 1, gap: 4 },
   bannerTitle: {
     fontFamily: 'Figtree_700Bold',
     fontSize: 22,
@@ -598,32 +898,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
   },
-  quick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  primary: {
+  menuCarousel: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  navChip: {
     paddingHorizontal: 16,
-    minHeight: 44,
-    borderRadius: 22,
-    backgroundColor: colors.accentGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryText: {
-    fontFamily: 'Figtree_700Bold',
-    color: '#0B0D10',
-    fontSize: 14,
-  },
-  secondary: {
-    paddingHorizontal: 14,
     minHeight: 44,
     borderRadius: 22,
     backgroundColor: colors.elevated,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryText: {
-    fontFamily: 'Figtree_700Bold',
+  navChipText: {
+    fontFamily: 'Figtree_600SemiBold',
+    color: colors.textPrimary,
+    fontSize: 14,
+  },
+  navBtn: {
+    paddingHorizontal: 14,
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBtnText: {
+    fontFamily: 'Figtree_600SemiBold',
     color: colors.textPrimary,
     fontSize: 14,
   },
@@ -633,12 +938,54 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginTop: 4,
   },
-  sectionHelp: {
+  createDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.md,
+    paddingTop: 10,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+  },
+  createMixinBtn: {
+    minHeight: 52,
+    borderRadius: 26,
+    backgroundColor: colors.accentGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createMixinBtnText: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 16,
+    color: '#0B0D10',
+  },
+  dangerZone: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    gap: 10,
+  },
+  deleteBtn: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,90,90,0.55)',
+    backgroundColor: 'rgba(255,90,90,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtnText: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 15,
+    color: '#FF6B6B',
+  },
+  deleteHint: {
     fontFamily: 'Figtree_400Regular',
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textMuted,
-    lineHeight: 18,
-    marginTop: -8,
+    lineHeight: 17,
   },
   empty: {
     fontFamily: 'Figtree_400Regular',
@@ -649,11 +996,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.elevated,
     borderRadius: radii.lg,
     padding: spacing.md,
-    gap: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(200,255,46,0.35)',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
   },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  cardCopy: { flex: 1, gap: 4 },
   cardTitle: {
+    flexShrink: 1,
     fontFamily: 'Figtree_700Bold',
     fontSize: 17,
     color: colors.textPrimary,
@@ -662,7 +1016,39 @@ const styles = StyleSheet.create({
     fontFamily: 'Figtree_400Regular',
     fontSize: 13,
     color: colors.textSecondary,
-    marginTop: -4,
+  },
+  moreBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  statusPillLive: {
+    borderColor: 'rgba(200,255,46,0.35)',
+    backgroundColor: 'rgba(200,255,46,0.12)',
+  },
+  statusPillMuted: {
+    opacity: 0.7,
+  },
+  statusPillText: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 11,
+    color: colors.textSecondary,
   },
   emptyRegs: {
     fontFamily: 'Figtree_400Regular',
@@ -705,75 +1091,75 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0B0D10',
   },
-  regCopy: { flex: 1, gap: 2 },
   regName: {
+    flex: 1,
     fontFamily: 'Figtree_600SemiBold',
     fontSize: 15,
     color: colors.textPrimary,
   },
-  regMeta: {
-    fontFamily: 'Figtree_400Regular',
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  playBtn: {
+  primaryBtn: {
     minHeight: 48,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: colors.accentGreen,
-    backgroundColor: colors.accentGreenDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playBtnText: {
-    fontFamily: 'Figtree_700Bold',
-    fontSize: 15,
-    color: colors.accentGreen,
-  },
-  youIn: {
-    fontFamily: 'Figtree_600SemiBold',
-    fontSize: 13,
-    color: colors.accentGreen,
-  },
-  confirmBtn: {
-    minHeight: 52,
-    borderRadius: 26,
+    borderRadius: 14,
     backgroundColor: colors.accentGreen,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  confirmDisabled: { opacity: 0.45 },
-  confirmText: {
+  primaryBtnText: {
     fontFamily: 'Figtree_700Bold',
     fontSize: 15,
     color: '#0B0D10',
   },
-  cardActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-    marginTop: 2,
+  secondaryBtn: {
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  link: {
+  secondaryBtnText: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  confirmDisabled: { opacity: 0.45 },
+  awaitingPill: {
+    minHeight: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  awaitingText: {
+    fontFamily: 'Figtree_500Medium',
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  actionChip: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionChipDanger: {
+    backgroundColor: 'rgba(255,90,90,0.12)',
+    borderColor: 'rgba(255,90,90,0.55)',
+  },
+  actionChipTextDanger: {
     fontFamily: 'Figtree_700Bold',
     fontSize: 13,
-    color: colors.accentGreen,
+    color: '#FF6B6B',
   },
   rowActions: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
-  },
-  linkDanger: {
-    fontFamily: 'Figtree_700Bold',
-    fontSize: 13,
-    color: colors.error,
-  },
-  membersHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
   },
   memberRow: {
     flexDirection: 'row',
@@ -788,14 +1174,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.accentGreen,
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontFamily: 'Figtree_700Bold',
-    fontSize: 16,
-    color: '#0B0D10',
+    fontSize: 15,
+    color: colors.textPrimary,
   },
   copy: { flex: 1, gap: 2 },
   name: {
@@ -806,16 +1194,6 @@ const styles = StyleSheet.create({
   meta: {
     fontFamily: 'Figtree_400Regular',
     fontSize: 12,
-    color: colors.textMuted,
-  },
-  note: {
-    fontFamily: 'Figtree_400Regular',
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  chevron: {
-    fontFamily: 'Figtree_400Regular',
-    fontSize: 22,
     color: colors.textMuted,
   },
 });

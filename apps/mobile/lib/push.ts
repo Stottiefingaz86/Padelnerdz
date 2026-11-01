@@ -84,6 +84,32 @@ export async function presentChatNotification(input: {
   });
 }
 
+/** Local banner when a mission / medal unlocks. */
+export async function presentAchievementNotification(input: {
+  title: string;
+  body: string;
+}) {
+  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('achievements', {
+      name: 'Missions & medals',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 220, 100, 220],
+      lightColor: '#C8FF2E',
+    });
+  }
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: input.title,
+      body: input.body,
+      sound: true,
+      data: { href: '/(tabs)/profile', kind: 'achievement' },
+      ...(Platform.OS === 'android' ? { channelId: 'achievements' } : null),
+    },
+    trigger: null,
+  });
+}
+
 /** Schedule a local reminder ~1 hour before mix-in start. */
 export async function scheduleMixinReminder(input: {
   sessionId: string;

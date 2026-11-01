@@ -35,6 +35,11 @@ Recommended icon approach:
 4. Discover should feel lively and local.
 5. Motion should be subtle, premium, and native-feeling.
 
+## Icons
+- **Source of truth:** [Lucide](https://lucide.dev/icons) via `lucide-react-native`.
+- **Wrapper:** `apps/mobile/components/Icon.tsx` — consistent size + stroke.
+- Do not mix SF Symbols / Material / custom stroke drawings for chrome icons.
+
 ## Primary product areas
 - Chats
 - Play

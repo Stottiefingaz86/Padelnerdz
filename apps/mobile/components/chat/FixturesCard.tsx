@@ -12,9 +12,11 @@ type Props = {
   round: number;
   matches: MatchRow[];
   onOpen: () => void;
+  format?: string | null;
 };
 
-export function FixturesCard({ round, matches, onOpen }: Props) {
+export function FixturesCard({ round, matches, onOpen, format }: Props) {
+  const isTournament = format === 'tournament_by_wins';
   return (
     <View style={styles.wrap}>
       <View style={styles.card}>
@@ -24,9 +26,13 @@ export function FixturesCard({ round, matches, onOpen }: Props) {
           </View>
           <Text style={styles.botName}>Padel Nerdz</Text>
         </View>
-        <Text style={styles.kicker}>COURTS</Text>
-        <Text style={styles.title}>Round {round}</Text>
-        <Text style={styles.sub}>Kings at the top · Queens at the bottom</Text>
+        <Text style={styles.kicker}>{isTournament ? 'TOURNAMENT' : 'COURTS'}</Text>
+        <Text style={styles.title}>{isTournament ? `Stage ${round}` : `Round ${round}`}</Text>
+        <Text style={styles.sub}>
+          {isTournament
+            ? 'Group tables · games won = points · then knockout'
+            : 'Kings & Queens on top · win and you stay'}
+        </Text>
 
         <View style={styles.matches}>
           {matches.map((m) => (

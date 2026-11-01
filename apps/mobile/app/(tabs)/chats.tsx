@@ -20,6 +20,7 @@ import { listMyDmThreads, type DmThread } from '@/lib/dm';
 import { subscribeDemoStore } from '@/lib/demo-store';
 import { select, tap } from '@/lib/feedback';
 import { listMyGroups, type GroupSummary } from '@/lib/groups';
+import { resolveMediaDisplayUrl } from '@/lib/media';
 import { listGroupSessions } from '@/lib/sessions';
 
 type Filter = 'all' | 'groups' | 'mixins' | 'dms' | 'unread';
@@ -33,6 +34,7 @@ type ChatRow =
       time: string;
       unread: number;
       memberCount: number;
+      imageUri: string | null;
     }
   | {
       kind: 'session';
@@ -82,6 +84,7 @@ export default function ChatsScreen() {
   const userId = user?.id ?? profile?.id ?? '';
 
   const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const [groupAvatars, setGroupAvatars] = useState<Record<string, string | null>>({});
   const [sessionRooms, setSessionRooms] = useState<
     { id: string; title: string; groupId: string; roomId: string; updatedAt: string }[]
   >([]);
@@ -99,6 +102,13 @@ export default function ChatsScreen() {
         listMyDmThreads(userId, isGuest),
       ]);
       setGroups(mine);
+      const avatarEntries = await Promise.all(
+        mine.map(async (g) => {
+          const raw = g.avatar_url || g.cover_url;
+          return [g.id, await resolveMediaDisplayUrl(raw)] as const;
+        }),
+      );
+      setGroupAvatars(Object.fromEntries(avatarEntries));
       setDms(threads);
       const unreadEntries = await Promise.all(
         mine.map(async (g) => [g.id, await unreadCountForGroup(g.id, userId)] as const),
@@ -126,6 +136,8 @@ export default function ChatsScreen() {
         }
       }
       setSessionRooms(rooms);
+    } catch {
+      // Keep last good list; avoid uncaught promise alerts on transient API errors.
     } finally {
       setLoading(false);
     }
@@ -155,6 +167,7 @@ export default function ChatsScreen() {
         time: timeLabel(preview?.at ?? group.created_at),
         unread: unreadByGroup[group.id] ?? 0,
         memberCount: group.member_count,
+        imageUri: groupAvatars[group.id] ?? null,
       };
     });
 
@@ -184,7 +197,7 @@ export default function ChatsScreen() {
       if (a.kind !== 'dm' && b.kind === 'dm') return 1;
       return 0;
     });
-  }, [groups, sessionRooms, dms, unreadByGroup]);
+  }, [groups, groupAvatars, sessionRooms, dms, unreadByGroup]);
 
   const filtered = useMemo(() => {
     switch (filter) {
@@ -306,6 +319,7 @@ export default function ChatsScreen() {
                 preview={item.preview}
                 timeLabel={item.time}
                 unread={item.unread}
+                imageUri={item.imageUri}
                 onPress={() => router.push(`/group/${item.id}/chat`)}
               />
             );

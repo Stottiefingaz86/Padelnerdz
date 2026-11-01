@@ -1,6 +1,6 @@
 import { colors, spacing } from '@padel-nerdz/config';
 import { PressableScale } from '@padel-nerdz/ui';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { tap } from '@/lib/feedback';
 
@@ -12,6 +12,8 @@ type Props = {
   accent?: string;
   unread?: number;
   subtitle?: string;
+  /** Group / peer photo — falls back to initial letter. */
+  imageUri?: string | null;
 };
 
 export function ChatListRow({
@@ -22,6 +24,7 @@ export function ChatListRow({
   accent,
   unread = 0,
   subtitle,
+  imageUri,
 }: Props) {
   const initial = title.slice(0, 1).toUpperCase();
   return (
@@ -32,9 +35,13 @@ export function ChatListRow({
       }}
       style={styles.row}
     >
-      <View style={[styles.avatar, accent ? { backgroundColor: accent } : null]}>
-        <Text style={styles.avatarText}>{initial}</Text>
-      </View>
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={styles.avatarImage} />
+      ) : (
+        <View style={[styles.avatar, accent ? { backgroundColor: accent } : null]}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+      )}
       <View style={styles.copy}>
         <View style={styles.top}>
           <Text style={styles.title} numberOfLines={1}>
@@ -78,6 +85,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F3A2E',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.elevated,
   },
   avatarText: {
     fontFamily: 'Figtree_700Bold',

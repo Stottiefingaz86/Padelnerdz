@@ -82,6 +82,20 @@ export default function SelectPlayersScreen() {
       setError('Select at least one player');
       return;
     }
+    if (!isGuest) {
+      try {
+        const { getGroupPaymentSettings, isStripePayoutReady } = await import(
+          '@/lib/payments'
+        );
+        const pay = await getGroupPaymentSettings(id, isGuest);
+        if (!isStripePayoutReady(pay)) {
+          setError('Connect your bank in Admin → Payments before confirming a paid lineup.');
+          return;
+        }
+      } catch {
+        // continue if settings unavailable
+      }
+    }
     setLoading(true);
     setError(null);
     try {

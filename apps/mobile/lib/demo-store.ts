@@ -1,5 +1,7 @@
 import {
+  DEFAULT_TOURNAMENT_BY_WINS_CONFIG,
   generateKingsAndQueensRound1,
+  seedTournamentByWins,
   type GroupRole,
   type GroupVisibility,
   type SessionFormat,
@@ -14,8 +16,10 @@ export type MessageKind =
   | 'wrap_card'
   | 'accept_notice'
   | 'players_card'
-  | 'fixtures_card';
+  | 'fixtures_card'
+  | 'arrival_card';
 
+/** Demo fixture payload — Kings & Queens or Tournament by wins (json-shaped). */
 export type DemoFixtureRound = {
   round: number;
   matches: Array<{
@@ -34,6 +38,8 @@ export type DemoFixtureRound = {
     winner?: 'a' | 'b' | null;
   }>;
   unassigned: Array<{ user_id: string; display_name: string }>;
+  format?: string;
+  [key: string]: unknown;
 };
 
 export type OrganiserLevel =
@@ -56,6 +62,7 @@ export type DemoGroup = {
   /** Demo distance from the user for Discover filters. */
   distance_miles: number | null;
   cover_url: string | null;
+  avatar_url: string | null;
   members_can_post: boolean;
   created_by: string;
   created_at: string;
@@ -90,6 +97,7 @@ export type DemoRegistration = {
     | 'no_show';
   reliability: number;
   payment_claimed_at?: string | null;
+  checked_in_at?: string | null;
 };
 
 export type DemoSession = {
@@ -128,6 +136,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'intermediate',
     distance_miles: 1.2,
     cover_url: null,
+    avatar_url: null,
     members_can_post: true,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -145,6 +154,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'beginner',
     distance_miles: 3.4,
     cover_url: null,
+    avatar_url: null,
     members_can_post: true,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -162,6 +172,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'pro',
     distance_miles: 2.1,
     cover_url: null,
+    avatar_url: null,
     members_can_post: false,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -179,6 +190,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'advanced',
     distance_miles: 4.0,
     cover_url: null,
+    avatar_url: null,
     members_can_post: true,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -196,6 +208,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'advanced',
     distance_miles: 2.8,
     cover_url: null,
+    avatar_url: null,
     members_can_post: true,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -213,6 +226,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'pro',
     distance_miles: 3.1,
     cover_url: null,
+    avatar_url: null,
     members_can_post: true,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -230,6 +244,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'intermediate',
     distance_miles: 2.4,
     cover_url: null,
+    avatar_url: null,
     members_can_post: true,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -247,6 +262,7 @@ let groups: DemoGroup[] = [
     skill_level_max: 'pro',
     distance_miles: 5.6,
     cover_url: null,
+    avatar_url: null,
     members_can_post: true,
     created_by: 'system',
     created_at: new Date().toISOString(),
@@ -291,12 +307,23 @@ export type DemoMember = {
   points: number;
 };
 
+export type DemoMessageReaction = {
+  id: string;
+  channel_type: 'group' | 'session_room';
+  channel_id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+};
+
 let memberships = new Set<string>();
 let messages: DemoMessage[] = [];
 let sessions: DemoSession[] = [];
 let registrations: DemoRegistration[] = [];
 let reliability = new Map<string, number>(); // `${groupId}:${userId}` -> 0-100
 let sessionRoomMessages: DemoMessage[] = [];
+let messageReactions: DemoMessageReaction[] = [];
 const groupMembers = new Map<string, DemoMember[]>();
 const fixturesBySession = new Map<string, DemoFixtureRound>();
 /** groupId → blocked user ids */
@@ -499,6 +526,7 @@ export function createDemoGroup(input: {
   skill_level?: OrganiserLevel | null;
   skill_level_max?: OrganiserLevel | null;
   cover_url?: string | null;
+  avatar_url?: string | null;
   ownerId?: string;
   ownerName?: string;
   inviteFriendIds?: string[];
@@ -515,6 +543,7 @@ export function createDemoGroup(input: {
     skill_level_max: input.skill_level_max ?? input.skill_level ?? null,
     distance_miles: 0.5,
     cover_url: input.cover_url ?? null,
+    avatar_url: input.avatar_url ?? null,
     members_can_post: true,
     created_by: ownerId,
     created_at: new Date().toISOString(),
@@ -617,6 +646,15 @@ export function inviteDemoFriendsToGroup(input: {
   return added;
 }
 
+export function deleteDemoGroup(id: string): boolean {
+  const existed = groups.some((g) => g.id === id);
+  if (!existed) return false;
+  groups = groups.filter((g) => g.id !== id);
+  groupMembers.delete(id);
+  emit();
+  return true;
+}
+
 export function updateDemoGroup(
   id: string,
   patch: Partial<
@@ -629,6 +667,7 @@ export function updateDemoGroup(
       | 'skill_level'
       | 'skill_level_max'
       | 'cover_url'
+      | 'avatar_url'
       | 'members_can_post'
     >
   >,
@@ -652,6 +691,28 @@ export function updateDemoMemberProfile(
   groupMembers.set(groupId, sortMembers(next));
   emit();
   return getDemoMember(groupId, userId);
+}
+
+/** Venue arrival check-in via QR / organiser scan. */
+export function markDemoCheckIn(input: {
+  sessionId: string;
+  userId: string;
+}): DemoRegistration | undefined {
+  const reg = registrations.find(
+    (r) => r.session_id === input.sessionId && r.user_id === input.userId,
+  );
+  if (!reg || reg.status !== 'paid') return undefined;
+  if (reg.checked_in_at) return reg;
+  const at = new Date().toISOString();
+  registrations = registrations.map((r) =>
+    r.session_id === input.sessionId && r.user_id === input.userId
+      ? { ...r, checked_in_at: at }
+      : r,
+  );
+  emit();
+  return registrations.find(
+    (r) => r.session_id === input.sessionId && r.user_id === input.userId,
+  );
 }
 
 /** Mark a confirmed session player as no-show — bumps no_shows + hurts reliability. */
@@ -845,6 +906,10 @@ export function listDemoSessions(groupId: string): DemoSession[] {
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 }
 
+export function getDemoSessionByRoomId(roomId: string): DemoSession | undefined {
+  return sessions.find((s) => s.session_room_id === roomId);
+}
+
 export function getDemoSession(sessionId: string): DemoSession | undefined {
   return sessions.find((s) => s.id === sessionId);
 }
@@ -1028,11 +1093,12 @@ export function maybeGenerateDemoFixturesAfterPayment(sessionId: string): {
     .sort((a, b) => b.reliability - a.reliability);
   if (paid.length < 4) return { ready: false, justCreated: false };
 
-  const round = generateKingsAndQueensRound1(
-    paid.map((r) => ({ user_id: r.user_id, display_name: r.display_name })),
-    session.courts,
-  );
-  fixturesBySession.set(sessionId, round);
+  const players = paid.map((r) => ({ user_id: r.user_id, display_name: r.display_name }));
+  const round =
+    session.format === 'tournament_by_wins'
+      ? seedTournamentByWins(players, DEFAULT_TOURNAMENT_BY_WINS_CONFIG)
+      : generateKingsAndQueensRound1(players, session.courts);
+  fixturesBySession.set(sessionId, round as DemoFixtureRound);
   return { ready: true, justCreated: true };
 }
 
@@ -1138,6 +1204,18 @@ export function verifyDemoPayment(input: {
       kind: 'system',
       body: `Welcome to ${session.title}. Share scores, photos, and plans here.`,
     });
+    sendDemoSessionRoomMessage({
+      session_room_id: roomId,
+      sender_id: null,
+      sender_name: 'Padel Nerdz',
+      kind: 'arrival_card',
+      body: 'When you arrive',
+      payload: {
+        session_id: input.sessionId,
+        venue_label: session.venue_label,
+        title: session.title,
+      },
+    });
   }
 
   sendDemoSessionRoomMessage({
@@ -1202,6 +1280,10 @@ export function closeDemoSession(input: {
   groupId: string;
   organiserId: string;
   wrapMediaUrl?: string | null;
+  /** Rich slideshow payload (players, fixtures, chat moments). */
+  wrapPayload?: Record<string, unknown> | null;
+  /** When true, caller posts the wrap card itself. */
+  skipWrapMessage?: boolean;
 }): DemoSession {
   const session = getDemoSession(input.sessionId);
   if (!session) throw new Error('Session not found');
@@ -1210,9 +1292,7 @@ export function closeDemoSession(input: {
     (r) =>
       r.status === 'paid' || r.status === 'selected' || r.status === 'payment_claimed',
   );
-  const wrapUri =
-    input.wrapMediaUrl ??
-    'https://images.unsplash.com/photo-1554068865-24cecd4e343f?w=800&q=80';
+  const wrapUri = input.wrapMediaUrl ?? null;
 
   sessions = sessions.map((s) =>
     s.id === input.sessionId
@@ -1225,28 +1305,46 @@ export function closeDemoSession(input: {
       : s,
   );
 
-  sendDemoMessage({
-    group_id: input.groupId,
-    sender_id: null,
-    sender_name: 'Padel Nerdz',
-    kind: 'wrap_card',
-    body: `Wrap-up: ${session.title}`,
-    payload: {
-      session_id: input.sessionId,
-      title: session.title,
-      media_url: wrapUri,
-      player_count: paid.length,
-      closed_at: new Date().toISOString(),
-    },
-  });
+  if (!input.skipWrapMessage) {
+    sendDemoMessage({
+      group_id: input.groupId,
+      sender_id: null,
+      sender_name: 'Padel Nerdz',
+      kind: 'wrap_card',
+      body: `Wrap-up: ${session.title}`,
+      payload: {
+        session_id: input.sessionId,
+        title: session.title,
+        media_url: wrapUri,
+        player_count: paid.length,
+        closed_at: new Date().toISOString(),
+        ...(input.wrapPayload ?? {}),
+      },
+    });
+  }
 
   if (session.session_room_id) {
     sendDemoSessionRoomMessage({
       session_room_id: session.session_room_id,
       sender_id: null,
       sender_name: 'Padel Nerdz',
+      kind: 'wrap_card',
+      body: `Wrap-up: ${session.title}`,
+      payload: {
+        session_id: input.sessionId,
+        title: session.title,
+        media_url: wrapUri,
+        player_count: paid.length,
+        closed_at: new Date().toISOString(),
+        ...(input.wrapPayload ?? {}),
+      },
+    });
+    sendDemoSessionRoomMessage({
+      session_room_id: session.session_room_id,
+      sender_id: null,
+      sender_name: 'Padel Nerdz',
       kind: 'system',
-      body: 'Session closed by the organiser. Chat stays archived for this lineup.',
+      body: 'Session closed — this chat is now read-only.',
     });
   }
 
@@ -1463,6 +1561,9 @@ export type DemoPaymentSettings = {
   bizum_phone: string | null;
   bizum_name: string | null;
   stripe_enabled: boolean;
+  stripe_account_id?: string | null;
+  stripe_charges_enabled?: boolean;
+  stripe_details_submitted?: boolean;
   payment_note: string | null;
 };
 
@@ -1473,12 +1574,15 @@ export function getDemoPaymentSettings(groupId: string): DemoPaymentSettings {
   if (existing) return existing;
   const blank: DemoPaymentSettings = {
     group_id: groupId,
-    preferred_method: 'revolut',
+    preferred_method: 'stripe',
     revolut_me_code: null,
     revolut_me_url: null,
     bizum_phone: null,
     bizum_name: null,
     stripe_enabled: false,
+    stripe_account_id: null,
+    stripe_charges_enabled: false,
+    stripe_details_submitted: false,
     payment_note: null,
   };
   paymentSettings.set(groupId, blank);
@@ -1517,4 +1621,202 @@ export function seedDemoRegistrants(sessionId: string, groupId: string) {
   const count = listDemoRegistrations(sessionId).length;
   sessions = sessions.map((s) => (s.id === sessionId ? { ...s, registered_count: count } : s));
   emit();
+}
+
+type DemoPointKind =
+  | 'paid_place'
+  | 'best_finish_1'
+  | 'best_finish_2'
+  | 'best_finish_3'
+  | 'session_closed_played'
+  | 'no_show';
+
+type DemoPointEvent = {
+  id: string;
+  group_id: string;
+  user_id: string;
+  session_id: string | null;
+  kind: DemoPointKind;
+  points: number;
+  created_at: string;
+};
+
+const POINT_VALUES: Record<DemoPointKind, number> = {
+  paid_place: 10,
+  best_finish_1: 25,
+  best_finish_2: 10,
+  best_finish_3: 10,
+  session_closed_played: 5,
+  no_show: -20,
+};
+
+let demoPointEvents: DemoPointEvent[] = [];
+
+function seedDemoPointsIfEmpty() {
+  if (demoPointEvents.length > 0) return;
+  const g = groups[0];
+  if (!g) return;
+  const now = Date.now();
+  const members = listDemoMembers(g.id);
+  for (const [i, m] of members.entries()) {
+    const n = Math.max(1, Math.floor(m.points / 10));
+    for (let k = 0; k < n; k++) {
+      demoPointEvents.push({
+        id: `dpe-${m.user_id}-${k}`,
+        group_id: g.id,
+        user_id: m.user_id,
+        session_id: null,
+        kind: 'paid_place',
+        points: 10,
+        created_at: new Date(now - (i * 3 + k) * 86400000).toISOString(),
+      });
+    }
+  }
+}
+
+export function awardDemoPointEvent(input: {
+  groupId: string;
+  userId: string;
+  kind: DemoPointKind;
+  sessionId: string | null;
+}) {
+  seedDemoPointsIfEmpty();
+  const pts = POINT_VALUES[input.kind];
+  if (
+    input.sessionId &&
+    demoPointEvents.some(
+      (e) =>
+        e.group_id === input.groupId &&
+        e.user_id === input.userId &&
+        e.session_id === input.sessionId &&
+        e.kind === input.kind,
+    )
+  ) {
+    return;
+  }
+  demoPointEvents.push({
+    id: `dpe-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    group_id: input.groupId,
+    user_id: input.userId,
+    session_id: input.sessionId,
+    kind: input.kind,
+    points: pts,
+    created_at: new Date().toISOString(),
+  });
+
+  const list = listDemoMembers(input.groupId).map((m) => {
+    if (m.user_id !== input.userId && !(input.userId.startsWith('local_') && m.user_id === 'guest')) {
+      return m;
+    }
+    return {
+      ...m,
+      points: m.points + pts,
+      sessions_played:
+        input.kind === 'paid_place' ? m.sessions_played + 1 : m.sessions_played,
+      no_shows: input.kind === 'no_show' ? m.no_shows + 1 : m.no_shows,
+      best_finish:
+        input.kind === 'best_finish_1'
+          ? 1
+          : input.kind === 'best_finish_2'
+            ? m.best_finish == null
+              ? 2
+              : Math.min(m.best_finish, 2)
+            : input.kind === 'best_finish_3'
+              ? m.best_finish == null
+                ? 3
+                : Math.min(m.best_finish, 3)
+              : m.best_finish,
+    };
+  });
+  groupMembers.set(input.groupId, sortMembers(list));
+  emit();
+}
+
+export function listDemoLeaderboard(
+  groupId: string,
+  period: 'all_time' | 'this_month' | 'last_year',
+  viewerId: string,
+) {
+  seedDemoPointsIfEmpty();
+  const now = Date.now();
+  let from = 0;
+  if (period === 'this_month') {
+    const d = new Date();
+    from = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  } else if (period === 'last_year') {
+    from = now - 365 * 86400000;
+  }
+
+  const totals = new Map<string, number>();
+  for (const m of listDemoMembers(groupId)) {
+    totals.set(m.user_id, 0);
+  }
+  for (const e of demoPointEvents) {
+    if (e.group_id !== groupId) continue;
+    if (from && new Date(e.created_at).getTime() < from) continue;
+    totals.set(e.user_id, (totals.get(e.user_id) ?? 0) + e.points);
+  }
+
+  const members = listDemoMembers(groupId);
+  const rows = [...totals.entries()]
+    .map(([user_id, points]) => {
+      const m = members.find((x) => x.user_id === user_id);
+      return {
+        user_id,
+        display_name: m?.display_name ?? 'Player',
+        avatar_url: null as string | null,
+        points,
+        rank: 0,
+        is_you:
+          user_id === viewerId ||
+          user_id === 'guest' ||
+          (viewerId.startsWith('local_') && user_id === 'guest'),
+      };
+    })
+    .sort((a, b) => b.points - a.points || a.display_name.localeCompare(b.display_name));
+
+  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+export function listDemoMessageReactions(
+  channelType: 'group' | 'session_room',
+  channelId: string,
+): DemoMessageReaction[] {
+  return messageReactions.filter(
+    (r) => r.channel_type === channelType && r.channel_id === channelId,
+  );
+}
+
+export function toggleDemoMessageReaction(input: {
+  channelType: 'group' | 'session_room';
+  channelId: string;
+  messageId: string;
+  userId: string;
+  emoji: string;
+}): DemoMessageReaction[] {
+  const existing = messageReactions.find(
+    (r) =>
+      r.channel_type === input.channelType &&
+      r.message_id === input.messageId &&
+      r.user_id === input.userId &&
+      r.emoji === input.emoji,
+  );
+  if (existing) {
+    messageReactions = messageReactions.filter((r) => r.id !== existing.id);
+  } else {
+    messageReactions = [
+      ...messageReactions,
+      {
+        id: `demo-react-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        channel_type: input.channelType,
+        channel_id: input.channelId,
+        message_id: input.messageId,
+        user_id: input.userId,
+        emoji: input.emoji,
+        created_at: new Date().toISOString(),
+      },
+    ];
+  }
+  emit();
+  return listDemoMessageReactions(input.channelType, input.channelId);
 }

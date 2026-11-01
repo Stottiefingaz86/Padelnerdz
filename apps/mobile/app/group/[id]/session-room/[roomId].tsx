@@ -7,29 +7,41 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CalendarPlus, Plus, QrCode, ScanLine, SendHorizontal } from 'lucide-react-native';
 
 import { Avatar } from '@/components/Avatar';
+import { ArrivalGuideCard } from '@/components/chat/ArrivalGuideCard';
+import { ChatWallpaper } from '@/components/chat/ChatWallpaper';
 import { FixturesCard } from '@/components/chat/FixturesCard';
 import { MediaBubble } from '@/components/chat/MediaBubble';
+import { MessageReactions } from '@/components/chat/MessageReactions';
 import { PlayersCard } from '@/components/chat/PlayersCard';
-import { FlatPlusIcon, FlatSendIcon } from '@/components/FlatIcons';
+import { SessionTicketCard } from '@/components/chat/SessionTicketCard';
+import { WrapCard } from '@/components/chat/WrapCard';
+import { HeaderBack } from '@/components/HeaderBack';
+import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
 import {
+  ensureArrivalGuideMessage,
   listSessionRoomMessages,
   sendSessionRoomMessage,
   subscribeChat,
   type ChatMessage,
 } from '@/lib/chat';
-import { select, success, tap, warn } from '@/lib/feedback';
+import { addSessionToCalendar } from '@/lib/calendar';
+import { chatAlert, messageSent, select, success, tap, warn } from '@/lib/feedback';
+import { setTyping, subscribeTyping } from '@/lib/typing';
 import {
   blockGroupMember,
   canOrganiseGroup,
@@ -37,23 +49,30 @@ import {
   removeGroupMember,
   type GroupSummary,
 } from '@/lib/groups';
-import { getSessionFixtures } from '@/lib/fixtures';
+import { getSessionFixtures, type FixtureRound } from '@/lib/fixtures';
 import { useGlassHeaderOffset } from '@/lib/layout';
 import {
+  listChannelReactions,
+  type MessageReactionMap,
+} from '@/lib/reactions';
+import {
+  ensurePaidSessionRoomAccess,
   getSession,
   listGroupSessions,
   listRegistrants,
+  markSessionCheckIn,
   markSessionNoShow,
   type Registrant,
   type SessionSummary,
 } from '@/lib/sessions';
 
 const EMOJIS = ['👍', '🔥', '😂', '💪', '🎾', '🙌', '❤️', '👏'];
+const STACK_FACE_COUNT = 5;
 
 export default function SessionRoomChatScreen() {
   const { id, roomId } = useLocalSearchParams<{ id: string; roomId: string }>();
   const insets = useSafeAreaInsets();
-  const headerOffset = useGlassHeaderOffset(8);
+  const headerOffset = useGlassHeaderOffset(24);
   const { profile, user , offline } = useAuth();
   const isGuest = offline;
   const userId = user?.id ?? profile?.id ?? '';
@@ -69,43 +88,145 @@ export default function SessionRoomChatScreen() {
   const [showEmoji, setShowEmoji] = useState(false);
   const [allowed, setAllowed] = useState(true);
   const [fixturesReady, setFixturesReady] = useState(false);
+  const [fixtures, setFixtures] = useState<FixtureRound | null>(null);
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [playersMenuOpen, setPlayersMenuOpen] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [typingLabel, setTypingLabel] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<MessageReactionMap>({});
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const lastAlertId = useRef<string | null>(null);
+  const nearBottom = useRef(true);
+  const typingIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const guidePosted = useRef(false);
+  const lockAlerted = useRef(false);
+  const refreshing = useRef(false);
   const organiser = canOrganiseGroup(group, userId);
+  const sessionClosed = session?.status === 'closed';
+  const stackTotal = Math.max(players.length, group?.member_count ?? 0);
+
+  function onChatScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    nearBottom.current =
+      contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+  }
 
   const refresh = useCallback(async () => {
-    if (!roomId || !userId) return;
-    setMessages(await listSessionRoomMessages(roomId, userId, isGuest));
+    if (!roomId || !userId || refreshing.current) return;
+    refreshing.current = true;
+    try {
+      let msgs = await listSessionRoomMessages(roomId, userId, isGuest);
 
-    if (id) {
-      const [sessions, g] = await Promise.all([
-        listGroupSessions(id, isGuest),
-        getGroup(id, userId, isGuest),
-      ]);
-      setGroup(g);
-      const found = sessions.find((s) => s.session_room_id === roomId);
-      if (found) {
-        setSession(found);
-        setTitle(found.title);
-        const regs = await listRegistrants(found.id, id, isGuest);
-        // Session room is for paid players only (accept ≠ unlock)
-        const confirmed = regs.filter((r) => r.status === 'paid' || r.status === 'no_show');
-        setPlayers(confirmed);
-        const fixtures = await getSessionFixtures(found.id, isGuest);
-        setFixturesReady(Boolean(fixtures));
-        const me = confirmed.find((r) => r.user_id === userId || r.user_id === 'guest');
-        const canEnter = Boolean(me) || isGuest || canOrganiseGroup(g, userId);
-        setAllowed(canEnter);
-        if (!canEnter) {
-          Alert.alert('Session locked', 'Pay to confirm your place before opening session chat.');
-          router.replace(`/group/${id}/pay/${found.id}`);
-        }
-      } else {
-        const maybe = await getSession(roomId.replace('demo-room-', 'demo-session-'), isGuest);
-        if (maybe) {
-          setSession(maybe);
-          setTitle(maybe.title);
+      if (id) {
+        const [sessions, g] = await Promise.all([
+          listGroupSessions(id, isGuest),
+          getGroup(id, userId, isGuest),
+        ]);
+        setGroup(g);
+        const found = sessions.find((s) => s.session_room_id === roomId);
+        if (found) {
+          setSession(found);
+          setTitle(found.title);
+          try {
+            await ensurePaidSessionRoomAccess({
+              sessionId: found.id,
+              userId,
+              isGuest,
+            });
+          } catch {
+            /* access ensure is best-effort while reading */
+          }
+          if (!guidePosted.current) {
+            try {
+              const posted = await ensureArrivalGuideMessage({
+                roomId,
+                sessionId: found.id,
+                venue: found.venue_label,
+                title: found.title,
+                userId,
+                isGuest,
+              });
+              guidePosted.current = true;
+              if (posted) {
+                msgs = await listSessionRoomMessages(roomId, userId, isGuest);
+              }
+            } catch {
+              guidePosted.current = true;
+            }
+          }
+          let confirmed: Registrant[] = [];
+          try {
+            const regs = await listRegistrants(found.id, id, isGuest);
+            confirmed = regs.filter((r) => r.status === 'paid' || r.status === 'no_show');
+            setPlayers(confirmed);
+            const me = confirmed.find((r) => r.user_id === userId || r.user_id === 'guest');
+            const myReg = regs.find((r) => r.user_id === userId);
+            const canEnter =
+              Boolean(me) ||
+              myReg?.status === 'paid' ||
+              isGuest ||
+              canOrganiseGroup(g, userId);
+            setAllowed(canEnter);
+            if (!canEnter && !lockAlerted.current) {
+              lockAlerted.current = true;
+              Alert.alert(
+                'Session locked',
+                'Pay to confirm your place before opening session chat.',
+              );
+              router.replace(`/group/${id}/pay/${found.id}`);
+            }
+          } catch (e) {
+            console.warn('session players failed', e);
+            setPlayers([]);
+          }
+          try {
+            const fx = await getSessionFixtures(found.id, isGuest);
+            setFixtures(fx);
+            setFixturesReady(Boolean(fx));
+          } catch {
+            setFixtures(null);
+            setFixturesReady(false);
+          }
+        } else {
+          const maybe = await getSession(
+            roomId.replace('demo-room-', 'demo-session-'),
+            isGuest,
+          );
+          if (maybe) {
+            setSession(maybe);
+            setTitle(maybe.title);
+          }
         }
       }
+      const newest = msgs[msgs.length - 1];
+      if (newest) {
+        if (lastAlertId.current == null) {
+          lastAlertId.current = newest.id;
+        } else if (
+          newest.id !== lastAlertId.current &&
+          !newest.mine &&
+          (newest.kind === 'text' || newest.kind === 'image' || newest.kind === 'video')
+        ) {
+          lastAlertId.current = newest.id;
+          void chatAlert(roomId);
+        } else {
+          lastAlertId.current = newest.id;
+        }
+      }
+      setMessages(msgs);
+      if (roomId) {
+        const reactionMap = await listChannelReactions({
+          channelType: 'session_room',
+          channelId: roomId,
+          userId,
+          isGuest,
+        }).catch(() => ({}) as MessageReactionMap);
+        setReactions(reactionMap);
+      }
+    } catch (e) {
+      console.warn('session room refresh failed', e);
+    } finally {
+      refreshing.current = false;
     }
   }, [roomId, userId, isGuest, id]);
 
@@ -116,9 +237,42 @@ export default function SessionRoomChatScreen() {
     });
   }, [refresh]);
 
+  useEffect(() => {
+    if (!roomId || !userId) return;
+    return subscribeTyping(roomId, userId, setTypingLabel);
+  }, [roomId, userId]);
+
+  useEffect(() => {
+    return () => {
+      if (typingIdleTimer.current) clearTimeout(typingIdleTimer.current);
+      if (roomId && userId) {
+        setTyping({ roomId, userId, displayName, active: false });
+      }
+    };
+  }, [roomId, userId, displayName]);
+
+  function onDraftChange(text: string) {
+    setDraft(text);
+    if (!roomId || !userId) return;
+    if (text.trim()) {
+      setTyping({ roomId, userId, displayName, active: true });
+      if (typingIdleTimer.current) clearTimeout(typingIdleTimer.current);
+      typingIdleTimer.current = setTimeout(() => {
+        setTyping({ roomId, userId, displayName, active: false });
+      }, 1600);
+    } else {
+      setTyping({ roomId, userId, displayName, active: false });
+    }
+  }
+
   async function onSend(body = draft) {
+    if (sessionClosed) {
+      Alert.alert('Read only', 'This session is closed.');
+      return;
+    }
     if (!roomId || !userId || !body.trim() || sending) return;
     setSending(true);
+    setTyping({ roomId, userId, displayName, active: false });
     try {
       await sendSessionRoomMessage({
         roomId,
@@ -129,7 +283,13 @@ export default function SessionRoomChatScreen() {
       });
       setDraft('');
       setShowEmoji(false);
+      void messageSent(roomId);
+      nearBottom.current = true;
       await refresh();
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    } catch (e) {
+      void warn();
+      Alert.alert('Message', e instanceof Error ? e.message : 'Could not send');
     } finally {
       setSending(false);
     }
@@ -144,23 +304,52 @@ export default function SessionRoomChatScreen() {
     }
 
     const isSelf = player.user_id === userId || player.user_id === 'guest';
+    const checkedIn = Boolean(player.checked_in_at);
     const options = isSelf
       ? ['View profile', 'Cancel']
       : player.status === 'no_show'
         ? ['View profile', 'Remove from group', 'Block from group', 'Cancel']
-        : [
-            'Mark did not show',
-            'View profile',
-            'Remove from group',
-            'Block from group',
-            'Cancel',
-          ];
+        : checkedIn
+          ? [
+              'Mark did not show',
+              'View profile',
+              'Remove from group',
+              'Block from group',
+              'Cancel',
+            ]
+          : [
+              'Mark arrived',
+              'Mark did not show',
+              'View profile',
+              'Remove from group',
+              'Block from group',
+              'Cancel',
+            ];
     const cancelButtonIndex = options.length - 1;
 
     const run = async (action: string) => {
       try {
         if (action === 'View profile') {
           router.push(`/group/${id}/member/${player.user_id}`);
+          return;
+        }
+        if (action === 'Mark arrived') {
+          await markSessionCheckIn({
+            sessionId: session.id,
+            groupId: id,
+            userId: player.user_id,
+            isGuest,
+          });
+          void success();
+          await sendSessionRoomMessage({
+            roomId: roomId!,
+            userId,
+            displayName: 'Padel Nerdz',
+            body: `${player.display_name} checked in.`,
+            isGuest,
+            kind: 'system',
+          });
+          await refresh();
           return;
         }
         if (action === 'Mark did not show') {
@@ -277,18 +466,30 @@ export default function SessionRoomChatScreen() {
   }
 
   async function pickMedia(video = false) {
+    if (sessionClosed) {
+      Alert.alert('Read only', 'This session is closed.');
+      return;
+    }
+    if (!roomId || !userId) return;
     void tap();
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      void warn();
+      Alert.alert('Photos', 'Allow photo library access to share media in this session.');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: video
-        ? ImagePicker.MediaTypeOptions.Videos
-        : ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: video ? ['videos'] : ['images'],
       quality: 0.85,
       videoMaxDuration: 60,
+      allowsEditing: false,
     });
-    if (result.canceled || !result.assets[0] || !roomId || !userId) return;
+    if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    if (!asset.uri) {
+      Alert.alert('Media', 'Couldn’t read that file. Try another photo.');
+      return;
+    }
     setSending(true);
     try {
       let path: string | null = null;
@@ -318,70 +519,170 @@ export default function SessionRoomChatScreen() {
           width: asset.width,
           height: asset.height,
           duration: asset.duration ?? null,
+          mime: asset.mimeType ?? null,
         },
       });
       setShowEmoji(false);
+      void messageSent(roomId);
+      nearBottom.current = true;
       await refresh();
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    } catch (e) {
+      void warn();
+      Alert.alert('Media', e instanceof Error ? e.message : 'Could not send media');
     } finally {
       setSending(false);
     }
   }
 
+  function openTicket() {
+    void tap();
+    setTicketOpen(true);
+  }
+
+  function openScanTickets() {
+    if (!organiser || !session || !id) return;
+    void tap();
+    setPlayersMenuOpen(false);
+    setAttachMenuOpen(false);
+    router.push(`/group/${id}/check-in/${session.id}`);
+  }
+
+  function openPlayersMenu() {
+    void tap();
+    setPlayersMenuOpen(true);
+  }
+
+  async function onAddToCalendar() {
+    if (!session) return;
+    void tap();
+    try {
+      await addSessionToCalendar({
+        title: session.title,
+        startsAt: session.starts_at,
+        venue: session.venue_label,
+      });
+    } catch (e) {
+      void warn();
+      Alert.alert('Calendar', e instanceof Error ? e.message : 'Could not open calendar');
+    }
+  }
+
   return (
     <>
-      <Stack.Screen options={{ title, headerBackTitle: 'Back' }} />
+      <Stack.Screen
+        options={{
+          headerBackVisible: false,
+          headerLeft: () => <HeaderBack fallbackHref={id ? `/group/${id}/chat` : undefined} />,
+          title,
+          headerTitleAlign: 'center',
+          headerRight: () => (
+            <Pressable
+              onPress={() => {
+                void tap();
+                openPlayersMenu();
+              }}
+              style={styles.headerStackBtn}
+              hitSlop={8}
+              accessibilityLabel={`${stackTotal} in group`}
+            >
+              {players.length === 0 ? (
+                <View style={styles.headerStack}>
+                  <View style={styles.headerStackEmpty}>
+                    <Text style={styles.headerStackCount}>0</Text>
+                  </View>
+                  {stackTotal > 0 ? (
+                    <View style={[styles.headerStackMore, { marginLeft: 4 }]}>
+                      <Text style={styles.headerStackMoreText}>{stackTotal}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={styles.headerStack}>
+                  {players.slice(0, STACK_FACE_COUNT).map((p, i) => (
+                    <View
+                      key={p.user_id}
+                      style={[
+                        styles.headerStackAvatar,
+                        {
+                          marginLeft: i === 0 ? 0 : -10,
+                          zIndex: STACK_FACE_COUNT - i,
+                        },
+                      ]}
+                    >
+                      <Avatar name={p.display_name} size={28} />
+                    </View>
+                  ))}
+                  <View style={[styles.headerStackMore, { marginLeft: -8, zIndex: 0 }]}>
+                    <Text style={styles.headerStackMoreText}>{stackTotal}</Text>
+                  </View>
+                </View>
+              )}
+            </Pressable>
+          ),
+        }}
+      />
+      {session ? (
+        <SessionTicketCard
+          visible={ticketOpen}
+          onClose={() => setTicketOpen(false)}
+          title={session.title}
+          startsAt={session.starts_at}
+          venue={session.venue_label}
+          format={session.format}
+          courts={session.courts}
+          maxPlayers={session.max_players}
+          players={players}
+          fixtures={fixtures}
+          viewerUserId={userId}
+          sessionId={session.id}
+          onAddToCalendar={() => void onAddToCalendar()}
+          onOpenFixtures={
+            fixturesReady && session
+              ? () => router.push(`/group/${id}/fixtures/${session.id}`)
+              : undefined
+          }
+        />
+      ) : null}
       <KeyboardAvoidingView
         style={styles.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        <View style={[styles.playersBar, { paddingTop: headerOffset }]}>
-          <View style={styles.playersHead}>
-            <Text style={styles.playersLabel}>Players · {players.length || '—'}</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playerRow}>
-            {players.length === 0 ? (
-              <Text style={styles.playerHint}>Confirmed players appear here after payment</Text>
-            ) : (
-              players.map((p) => (
-                <Pressable
-                  key={p.user_id}
-                  style={[styles.playerChip, p.status === 'no_show' && styles.playerNoShow]}
-                  onPress={() => {
-                    void tap();
-                    openPlayerActions(p);
-                  }}
-                >
-                  <Avatar name={p.display_name} size={36} />
-                  <Text style={styles.playerName} numberOfLines={1}>
-                    {p.display_name.split(' ')[0]}
-                  </Text>
-                  {p.status === 'no_show' ? (
-                    <Text style={styles.noShowBadge}>No-show</Text>
-                  ) : null}
-                </Pressable>
-              ))
-            )}
-          </ScrollView>
-          {session && fixturesReady ? (
-            <Pressable
-              style={styles.fixturesCta}
-              onPress={() => {
-                void tap();
-                router.push(`/group/${id}/fixtures/${session.id}`);
-              }}
-            >
-              <View>
-                <Text style={styles.fixturesCtaKicker}>MIX-IN COURTS</Text>
-                <Text style={styles.fixturesCtaTitle}>Open fixtures & scores</Text>
+        <ChatWallpaper>
+        <View style={[styles.sessionTop, { paddingTop: headerOffset }]}>
+          {session ? (
+            <View style={styles.actionCard}>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionWhen} numberOfLines={1}>
+                  {new Date(session.starts_at).toLocaleString([], {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+                <Text style={styles.actionWhere} numberOfLines={1}>
+                  {session.venue_label?.trim() || 'Venue TBC'}
+                </Text>
               </View>
-              <Text style={styles.fixturesCtaChevron}>→</Text>
-            </Pressable>
-          ) : session ? (
-            <View style={styles.fixturesWaiting}>
-              <Text style={styles.fixturesWaitingText}>
-                Courts unlock once enough players have paid
-              </Text>
+              <View style={styles.actionBtns}>
+                <Pressable
+                  style={styles.actionBtn}
+                  onPress={openTicket}
+                  accessibilityLabel="Open ticket QR"
+                >
+                  <Icon icon={QrCode} color={colors.accentGreen} size="md" />
+                </Pressable>
+                <Pressable
+                  style={styles.actionBtn}
+                  onPress={() => void onAddToCalendar()}
+                  accessibilityLabel="Add to calendar"
+                >
+                  <Icon icon={CalendarPlus} color={colors.accentGreen} size="md" />
+                </Pressable>
+              </View>
             </View>
           ) : null}
         </View>
@@ -390,14 +691,56 @@ export default function SessionRoomChatScreen() {
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
+          style={styles.listFlex}
           contentContainerStyle={styles.list}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          onScroll={onChatScroll}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          onContentSizeChange={() => {
+            if (nearBottom.current) {
+              listRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
           renderItem={({ item }) => {
             if (item.kind === 'system') {
               return (
                 <View style={styles.systemWrap}>
                   <Text style={styles.systemText}>{item.body}</Text>
                 </View>
+              );
+            }
+            if (item.kind === 'wrap_card') {
+              const wrapSessionId = String(item.payload.session_id ?? session?.id ?? '');
+              return (
+                <WrapCard
+                  title={String(item.payload.title ?? item.body)}
+                  subtitle="Tap to play the session wrap"
+                  mediaUrl={(item.payload.media_url as string | null) ?? null}
+                  playerCount={Number(item.payload.player_count ?? 0) || undefined}
+                  photoCount={Number(item.payload.photo_count ?? 0) || undefined}
+                  matchCount={Number(item.payload.match_count ?? 0) || undefined}
+                  onOpen={
+                    wrapSessionId && id
+                      ? () => {
+                          void tap();
+                          router.push(`/group/${id}/wrap/${wrapSessionId}`);
+                        }
+                      : undefined
+                  }
+                />
+              );
+            }
+            if (item.kind === 'arrival_card') {
+              return (
+                <ArrivalGuideCard
+                  venue={
+                    (item.payload.venue_label as string | null | undefined) ??
+                    session?.venue_label
+                  }
+                  organiserView={organiser}
+                  onOpenTicket={openTicket}
+                />
               );
             }
             if (item.kind === 'players_card') {
@@ -429,6 +772,7 @@ export default function SessionRoomChatScreen() {
                 <FixturesCard
                   round={Number(item.payload.round ?? 1)}
                   matches={matches}
+                  format={session?.format}
                   onOpen={() => {
                     void tap();
                     if (sessionIdForCard) {
@@ -440,30 +784,60 @@ export default function SessionRoomChatScreen() {
             }
             if (item.kind === 'image' || item.kind === 'video') {
               return (
-                <MediaBubble
-                  path={item.payload.path ? String(item.payload.path) : null}
-                  uri={String(item.payload.uri ?? '')}
-                  kind={item.kind}
-                  sender={item.sender_name}
-                  mine={item.mine}
-                  createdAt={item.created_at}
-                />
+                <View>
+                  <MediaBubble
+                    path={item.payload.path ? String(item.payload.path) : null}
+                    uri={String(item.payload.uri ?? '')}
+                    kind={item.kind}
+                    sender={item.sender_name}
+                    mine={item.mine}
+                    createdAt={item.created_at}
+                  />
+                  <MessageReactions
+                    messageId={item.id}
+                    channelType="session_room"
+                    channelId={roomId!}
+                    userId={userId}
+                    isGuest={isGuest}
+                    reactions={reactions[item.id]}
+                    align={item.mine ? 'right' : 'left'}
+                    onChanged={setReactions}
+                  />
+                </View>
               );
             }
             return (
-              <View style={[styles.bubble, item.mine ? styles.mine : styles.theirs]}>
-                {!item.mine ? <Text style={styles.sender}>{item.sender_name}</Text> : null}
-                <Text style={styles.body}>{item.body}</Text>
-                <Text style={styles.time}>
-                  {new Date(item.created_at).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
+              <View>
+                <View style={[styles.bubble, item.mine ? styles.mine : styles.theirs]}>
+                  {!item.mine ? <Text style={styles.sender}>{item.sender_name}</Text> : null}
+                  <Text style={styles.body}>{item.body}</Text>
+                  <Text style={styles.time}>
+                    {new Date(item.created_at).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+                <MessageReactions
+                  messageId={item.id}
+                  channelType="session_room"
+                  channelId={roomId!}
+                  userId={userId}
+                  isGuest={isGuest}
+                  reactions={reactions[item.id]}
+                  align={item.mine ? 'right' : 'left'}
+                  onChanged={setReactions}
+                />
               </View>
             );
           }}
         />
+
+        {typingLabel ? (
+          <View style={styles.typingBar}>
+            <Text style={styles.typingText}>{typingLabel}</Text>
+          </View>
+        ) : null}
 
         {showEmoji ? (
           <View style={styles.emojiBar}>
@@ -472,7 +846,7 @@ export default function SessionRoomChatScreen() {
                 key={e}
                 onPress={() => {
                   void tap();
-                  setDraft((d) => d + e);
+                  onDraftChange(draft + e);
                 }}
                 style={styles.emojiBtn}
               >
@@ -482,54 +856,163 @@ export default function SessionRoomChatScreen() {
           </View>
         ) : null}
 
-        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-          <Pressable
-            onPress={() => {
-              void tap();
-              const options = ['Photo', 'Video', 'Emoji', 'Cancel'];
-              const cancelButtonIndex = 3;
-              if (Platform.OS === 'ios') {
-                ActionSheetIOS.showActionSheetWithOptions(
-                  { options, cancelButtonIndex },
-                  (i) => {
-                    if (i === 0) void pickMedia(false);
-                    else if (i === 1) void pickMedia(true);
-                    else if (i === 2) setShowEmoji((v) => !v);
-                  },
-                );
-                return;
-              }
-              Alert.alert('Attach', undefined, [
-                { text: 'Photo', onPress: () => void pickMedia(false) },
-                { text: 'Video', onPress: () => void pickMedia(true) },
-                { text: 'Emoji', onPress: () => setShowEmoji((v) => !v) },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}
-            style={styles.plus}
-          >
-            <FlatPlusIcon color={colors.textPrimary} size={20} />
-          </Pressable>
-          <TextInput
-            style={styles.input}
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Message"
-            placeholderTextColor={colors.textMuted}
-            cursorColor={colors.accentGreen}
-            selectionColor="rgba(200,255,46,0.28)"
-            keyboardAppearance="dark"
-            underlineColorAndroid="transparent"
-            multiline
-          />
-          <Pressable
-            onPress={() => void onSend()}
-            disabled={sending || !draft.trim()}
-            style={[styles.send, (!draft.trim() || sending) && styles.sendDisabled]}
-          >
-            <FlatSendIcon />
-          </Pressable>
-        </View>
+        <Modal
+          visible={playersMenuOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPlayersMenuOpen(false)}
+        >
+          <View style={styles.sheetScrim}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setPlayersMenuOpen(false)} />
+            <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              <Text style={styles.sheetTitle}>Players · {players.length}</Text>
+              {organiser && session ? (
+                <Pressable style={styles.sheetScan} onPress={openScanTickets}>
+                  <Icon icon={ScanLine} color="#0B0D10" size="md" />
+                  <Text style={styles.sheetScanText}>Scan tickets</Text>
+                </Pressable>
+              ) : null}
+              {fixturesReady && session ? (
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    void select();
+                    setPlayersMenuOpen(false);
+                    router.push(`/group/${id}/fixtures/${session.id}`);
+                  }}
+                >
+                  <Text style={styles.sheetRowText}>Open fixtures</Text>
+                </Pressable>
+              ) : null}
+              {players.length === 0 ? (
+                <Text style={styles.sheetEmpty}>
+                  {organiser
+                    ? 'No confirmed players yet — scan when they arrive.'
+                    : 'Confirmed players appear after payment.'}
+                </Text>
+              ) : (
+                players.map((p) => (
+                  <Pressable
+                    key={p.user_id}
+                    style={styles.sheetRow}
+                    onPress={() => {
+                      void select();
+                      setPlayersMenuOpen(false);
+                      openPlayerActions(p);
+                    }}
+                  >
+                    <Avatar name={p.display_name} size={32} />
+                    <Text style={styles.sheetRowText}>{p.display_name}</Text>
+                  </Pressable>
+                ))
+              )}
+              <Pressable style={styles.sheetCancel} onPress={() => setPlayersMenuOpen(false)}>
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={attachMenuOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAttachMenuOpen(false)}
+        >
+          <View style={styles.sheetScrim}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setAttachMenuOpen(false)} />
+            <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              <Text style={styles.sheetTitle}>Attach</Text>
+              {organiser && session ? (
+                <Pressable style={styles.sheetScan} onPress={openScanTickets}>
+                  <Icon icon={ScanLine} color="#0B0D10" size="md" />
+                  <Text style={styles.sheetScanText}>Scan tickets</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                style={styles.sheetRow}
+                onPress={() => {
+                  setAttachMenuOpen(false);
+                  void pickMedia(false);
+                }}
+              >
+                <Text style={styles.sheetRowText}>Photo</Text>
+              </Pressable>
+              <Pressable
+                style={styles.sheetRow}
+                onPress={() => {
+                  setAttachMenuOpen(false);
+                  void pickMedia(true);
+                }}
+              >
+                <Text style={styles.sheetRowText}>Video</Text>
+              </Pressable>
+              <Pressable
+                style={styles.sheetRow}
+                onPress={() => {
+                  setAttachMenuOpen(false);
+                  setShowEmoji((v) => !v);
+                }}
+              >
+                <Text style={styles.sheetRowText}>Emoji</Text>
+              </Pressable>
+              <Pressable style={styles.sheetCancel} onPress={() => setAttachMenuOpen(false)}>
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {sessionClosed ? (
+          <View style={[styles.closedBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <Text style={styles.closedBarText}>Session closed — chat is read-only</Text>
+            {session ? (
+              <Pressable
+                style={styles.closedWrapBtn}
+                onPress={() => {
+                  void tap();
+                  router.push(`/group/${id}/wrap/${session.id}`);
+                }}
+              >
+                <Text style={styles.closedWrapBtnText}>Open wrap</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            <Pressable
+              onPress={() => {
+                void tap();
+                setAttachMenuOpen(true);
+              }}
+              style={styles.plus}
+              accessibilityLabel="Attach photo or video"
+            >
+              <Icon icon={Plus} color={colors.textPrimary} size="md" />
+            </Pressable>
+            <TextInput
+              style={styles.input}
+              value={draft}
+              onChangeText={onDraftChange}
+              placeholder="Message"
+              placeholderTextColor={colors.textMuted}
+              cursorColor={colors.accentGreen}
+              selectionColor="rgba(200,255,46,0.28)"
+              keyboardAppearance="dark"
+              underlineColorAndroid="transparent"
+              multiline
+            />
+            <Pressable
+              onPress={() => void onSend()}
+              disabled={sending || !draft.trim()}
+              style={[styles.send, (!draft.trim() || sending) && styles.sendDisabled]}
+              accessibilityLabel="Send"
+            >
+              <Icon icon={SendHorizontal} color="#0B0D10" size={18} />
+            </Pressable>
+          </View>
+        )}
+        </ChatWallpaper>
       </KeyboardAvoidingView>
     </>
   );
@@ -537,91 +1020,180 @@ export default function SessionRoomChatScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  playersBar: {
+  listFlex: { flex: 1, backgroundColor: 'transparent' },
+  sessionTop: {
     backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderSubtle,
-    paddingBottom: 10,
-    gap: 8,
   },
-  playersHead: {
+  sheetScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 16,
     paddingHorizontal: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
   },
-  playersLabel: {
-    fontFamily: 'Figtree_600SemiBold',
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  fixturesCta: {
-    marginHorizontal: spacing.md,
-    marginTop: 4,
-    backgroundColor: colors.accentGreen,
-    borderRadius: 14,
-    minHeight: 56,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  fixturesCtaKicker: {
+  sheetTitle: {
     fontFamily: 'Figtree_700Bold',
-    fontSize: 10,
-    letterSpacing: 0.8,
-    color: 'rgba(11,13,16,0.65)',
+    fontSize: 13,
+    letterSpacing: 0.5,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  fixturesCtaTitle: {
+  sheetScan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 52,
+    borderRadius: 14,
+    backgroundColor: colors.accentGreen,
+    paddingHorizontal: 16,
+  },
+  sheetScanText: {
     fontFamily: 'Figtree_700Bold',
     fontSize: 16,
     color: '#0B0D10',
-    marginTop: 2,
   },
-  fixturesCtaChevron: {
-    fontFamily: 'Figtree_700Bold',
-    fontSize: 22,
-    color: '#0B0D10',
-  },
-  fixturesWaiting: {
-    marginHorizontal: spacing.md,
-    marginTop: 4,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 48,
+    paddingHorizontal: 12,
     borderRadius: 12,
+    backgroundColor: colors.elevated,
+  },
+  sheetRowText: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 16,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  sheetEmpty: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 14,
+    color: colors.textMuted,
+    lineHeight: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  sheetCancel: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  sheetCancelText: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  actionCard: {
+    marginHorizontal: spacing.md,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 64,
+    paddingVertical: 10,
+    paddingLeft: 14,
+    paddingRight: 10,
+    borderRadius: 16,
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,46,0.28)',
+  },
+  typingBar: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+  },
+  typingText: {
+    fontFamily: 'Figtree_500Medium',
+    fontSize: 13,
+    color: colors.accentGreen,
+  },
+  actionCopy: { flex: 1, gap: 2 },
+  actionWhen: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  actionWhere: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  actionBtns: { flexDirection: 'row', gap: 8 },
+  actionBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.accentGreenDim,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,46,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerStackBtn: {
+    marginRight: Platform.OS === 'ios' ? 4 : 8,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 2,
+  },
+  headerStackAvatar: {
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.background,
+    overflow: 'hidden',
+  },
+  headerStackMore: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.elevated,
+    borderWidth: 2,
+    borderColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerStackMoreText: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 10,
+    color: colors.textPrimary,
+  },
+  headerStackEmpty: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.elevated,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-  },
-  fixturesWaitingText: {
-    fontFamily: 'Figtree_500Medium',
-    fontSize: 13,
-    color: colors.textMuted,
-  },
-  playerRow: {
-    paddingHorizontal: spacing.md,
-    gap: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  playerHint: {
-    color: colors.textMuted,
-    fontFamily: 'Figtree_400Regular',
-    fontSize: 13,
-  },
-  playerChip: { alignItems: 'center', width: 64, gap: 4 },
-  playerNoShow: { opacity: 0.45 },
-  playerName: {
-    fontFamily: 'Figtree_400Regular',
+  headerStackCount: {
+    fontFamily: 'Figtree_700Bold',
     fontSize: 11,
-    color: colors.textSecondary,
-    width: '100%',
-    textAlign: 'center',
-  },
-  noShowBadge: {
-    fontFamily: 'Figtree_600SemiBold',
-    fontSize: 9,
-    color: colors.error,
-    letterSpacing: 0.2,
+    color: colors.textMuted,
   },
   list: {
     padding: spacing.md,
@@ -727,6 +1299,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.elevated,
+  },
+  closedBar: {
+    paddingTop: 12,
+    paddingHorizontal: spacing.md,
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+  },
+  closedBarText: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  closedWrapBtn: {
+    minHeight: 44,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    backgroundColor: colors.accentGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  closedWrapBtnText: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 15,
+    color: '#0B0D10',
   },
   composer: {
     flexDirection: 'row',

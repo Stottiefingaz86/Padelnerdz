@@ -2,12 +2,20 @@ import { AppButton } from '@/components/AppButton';
 import { colors, radii, spacing, typography } from '@padel-nerdz/config';
 import { Screen } from '@padel-nerdz/ui';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { CalendarPlus, QrCode } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { SessionTicketCard, type TicketPlayer } from '@/components/chat/SessionTicketCard';
 import { useCelebration } from '@/components/CelebrationHost';
+import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
-import { markCelebrated, syncAchievementsFromStats } from '@/lib/achievements';
+import {
+  markCelebrated,
+  presentFreshUnlocks,
+  syncAchievementsFromStats,
+} from '@/lib/achievements';
+import { addSessionToCalendar } from '@/lib/calendar';
 import { tap, success, warn, revolutPulse } from '@/lib/feedback';
 import { canOrganiseGroup, getGroup } from '@/lib/groups';
 import { formatMoney, PLATFORM_FEE_CENTS, priceBreakdown } from '@/lib/pricing';
@@ -37,12 +45,12 @@ function stateCopy(state: MyRegistrationState): { label: string; note: string } 
     case 'selected_pay':
       return {
         label: 'Pay to confirm',
-        note: 'You were selected. Pay via Bizum/Revolut, then tap I’ve paid. The organiser must verify the transfer before session chat unlocks.',
+        note: 'You were selected. Pay in-app with Stripe to lock your place — session chat unlocks automatically when payment succeeds.',
       };
     case 'awaiting_verify':
       return {
         label: 'Waiting for organiser',
-        note: 'You claimed payment. The organiser is checking Bizum/Revolut. Session chat unlocks after they confirm received.',
+        note: 'Payment is processing. If Stripe already succeeded, pull to refresh — session chat unlocks when the webhook confirms.',
       };
     case 'paid':
       return {
@@ -76,6 +84,8 @@ export default function SessionDetailScreen() {
   const [openSpots, setOpenSpots] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [ticketPlayers, setTicketPlayers] = useState<TicketPlayer[]>([]);
+  const [ticketOpen, setTicketOpen] = useState(false);
 
   const load = useCallback(async () => {
     const sid = Array.isArray(sessionId) ? sessionId[0] : sessionId;
@@ -113,6 +123,16 @@ export default function SessionDetailScreen() {
 
     const nextState = registrationStateForUser(regs, userId);
     setMyState(nextState);
+    setTicketPlayers(
+      regs
+        .filter((r) => r.status === 'paid' || r.status === 'selected')
+        .map((r) => ({
+          user_id: r.user_id,
+          display_name: r.display_name,
+          status: r.status,
+          checked_in_at: r.checked_in_at,
+        })),
+    );
     const locked = regs.filter(
       (r) =>
         r.status === 'paid' || r.status === 'selected' || r.status === 'payment_claimed',
@@ -131,13 +151,9 @@ export default function SessionDetailScreen() {
             : 'Organiser picked you — pay to lock your spot.',
         });
         const unlocked = await syncAchievementsFromStats({ mixinsPlayed: 1 });
-        if (unlocked[0]) {
+        if (unlocked.length) {
           setTimeout(() => {
-            celebrate({
-              mark: unlocked[0]!.mark,
-              title: unlocked[0]!.title,
-              body: unlocked[0]!.body,
-            });
+            void presentFreshUnlocks(unlocked, celebrate);
           }, 3400);
         }
       }
@@ -250,6 +266,26 @@ export default function SessionDetailScreen() {
     }
   }
 
+  async function onAddToCalendar() {
+    if (!session) return;
+    void tap();
+    try {
+      await addSessionToCalendar({
+        title: session.title,
+        startsAt: session.starts_at,
+        venue: session.venue_label,
+      });
+    } catch (e) {
+      void warn();
+      Alert.alert('Calendar', e instanceof Error ? e.message : 'Could not open calendar');
+    }
+  }
+
+  function openTicket() {
+    void tap();
+    setTicketOpen(true);
+  }
+
   const copy = stateCopy(myState);
   const canWithdraw =
     myState === 'interested' ||
@@ -300,6 +336,41 @@ export default function SessionDetailScreen() {
 
             <Text style={styles.body}>{copy.note}</Text>
 
+            {myState === 'paid' && session ? (
+              <View style={styles.actionCard}>
+                <View style={styles.actionCopy}>
+                  <Text style={styles.actionWhen} numberOfLines={1}>
+                    {new Date(session.starts_at).toLocaleString([], {
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                  <Text style={styles.actionWhere} numberOfLines={1}>
+                    {session.venue_label?.trim() || 'Venue TBC'}
+                  </Text>
+                </View>
+                <View style={styles.actionBtns}>
+                  <Pressable
+                    style={styles.actionBtn}
+                    onPress={openTicket}
+                    accessibilityLabel="Open ticket QR"
+                  >
+                    <Icon icon={QrCode} color={colors.accentGreen} size="md" />
+                  </Pressable>
+                  <Pressable
+                    style={styles.actionBtn}
+                    onPress={() => void onAddToCalendar()}
+                    accessibilityLabel="Add to calendar"
+                  >
+                    <Icon icon={CalendarPlus} color={colors.accentGreen} size="md" />
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
             <AppButton
               label={
                 myState === 'none' || myState === 'withdrawn'
@@ -332,13 +403,9 @@ export default function SessionDetailScreen() {
             {organiser ? (
               <View style={styles.orgBlock}>
                 <Text style={styles.orgLabel}>Organiser</Text>
-                <AppButton
-                  label="Verify payments"
-                  onPress={() => {
-                    void tap();
-                    router.push(`/group/${id}/verify-payments/${sessionId}`);
-                  }}
-                />
+                <Text style={styles.orgHint}>
+                  Players pay with Stripe. Places unlock automatically — no manual verify.
+                </Text>
                 <AppButton
                   label="Fill open spot"
                   variant="secondary"
@@ -379,6 +446,23 @@ export default function SessionDetailScreen() {
             ) : null}
           </View>
         )}
+
+        {session && myState === 'paid' ? (
+          <SessionTicketCard
+            visible={ticketOpen}
+            onClose={() => setTicketOpen(false)}
+            title={session.title}
+            startsAt={session.starts_at}
+            venue={session.venue_label}
+            format={session.format}
+            courts={session.courts}
+            maxPlayers={session.max_players}
+            players={ticketPlayers}
+            viewerUserId={userId}
+            sessionId={session.id}
+            onAddToCalendar={() => void onAddToCalendar()}
+          />
+        ) : null}
       </Screen>
     </>
   );
@@ -429,6 +513,41 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
   },
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 64,
+    paddingVertical: 10,
+    paddingLeft: 14,
+    paddingRight: 10,
+    borderRadius: 16,
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,46,0.28)',
+  },
+  actionCopy: { flex: 1, gap: 2, minWidth: 0 },
+  actionWhen: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  actionWhere: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  actionBtns: { flexDirection: 'row', gap: 8 },
+  actionBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   orgBlock: { gap: spacing.sm },
   orgLabel: {
     fontFamily: 'Figtree_700Bold',
@@ -436,6 +555,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     color: colors.textMuted,
     textTransform: 'uppercase',
+  },
+  orgHint: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
   message: {
     ...typography.body,

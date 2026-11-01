@@ -3,25 +3,26 @@ import type { GroupVisibility } from '@padel-nerdz/domain';
 import { colors, radii, spacing, typography } from '@padel-nerdz/config';
 import { Screen, TextField } from '@padel-nerdz/ui';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
+import { LocateFixed } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
-import { LevelRangePicker, type LevelRange } from '@/components/LevelRangePicker';
+import { LevelRangePicker, type LevelChoice } from '@/components/LevelRangePicker';
+import { Icon } from '@/components/Icon';
 import { VisibilityPicker } from '@/components/VisibilityPicker';
 import { useAuth } from '@/lib/auth';
 import { listFriends, type Friend } from '@/lib/friends';
 import { createGroup } from '@/lib/groups';
-import { AREA_HUBS } from '@/lib/locations';
-import { select, tap } from '@/lib/feedback';
+import { select, tap, warn } from '@/lib/feedback';
 
 function describeError(e: unknown): string {
   if (e instanceof Error && e.message.trim()) return e.message;
@@ -36,6 +37,17 @@ function describeError(e: unknown): string {
   return 'Could not create group — try again or sign out and back in';
 }
 
+function placeFromGeocode(row: Location.LocationGeocodedAddress) {
+  return (
+    row.city?.trim() ||
+    row.subregion?.trim() ||
+    row.district?.trim() ||
+    row.region?.trim() ||
+    row.name?.trim() ||
+    null
+  );
+}
+
 export default function CreateGroupScreen() {
   const { profile, user, offline } = useAuth();
   const isGuest = offline;
@@ -43,10 +55,11 @@ export default function CreateGroupScreen() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('Sotogrande');
+  const [location, setLocation] = useState('');
+  const [locating, setLocating] = useState(false);
   const [coverUri, setCoverUri] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<GroupVisibility>('private');
-  const [levelRange, setLevelRange] = useState<LevelRange | null>(null);
+  const [levelChoice, setLevelChoice] = useState<LevelChoice>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [inviteIds, setInviteIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -55,7 +68,9 @@ export default function CreateGroupScreen() {
   const needsLevel = visibility === 'public' || visibility === 'approval';
 
   useEffect(() => {
-    void listFriends().then(setFriends);
+    void listFriends()
+      .then(setFriends)
+      .catch(() => setFriends([]));
   }, []);
 
   async function pickCover() {
@@ -77,6 +92,37 @@ export default function CreateGroupScreen() {
     }
   }
 
+  async function useMyLocation() {
+    void tap();
+    setLocating(true);
+    setError(undefined);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Allow location to fill your town, or type it below.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const places = await Location.reverseGeocodeAsync({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      });
+      const label = places.map(placeFromGeocode).find(Boolean);
+      if (!label) {
+        setError('Couldn’t read a town from GPS — type your city instead.');
+        return;
+      }
+      setLocation(label);
+    } catch {
+      void warn();
+      setError('Location failed — type any town or city instead.');
+    } finally {
+      setLocating(false);
+    }
+  }
+
   function toggleFriend(id: string) {
     void select();
     setInviteIds((prev) => {
@@ -93,8 +139,12 @@ export default function CreateGroupScreen() {
       setError('Group name needs at least 2 characters');
       return;
     }
-    if (needsLevel && !levelRange) {
-      setError('Choose who can join (you can pick a band like Beginner–Intermediate)');
+    if (!location.trim()) {
+      setError('Add a town or city — use location or type it.');
+      return;
+    }
+    if (needsLevel && !levelChoice) {
+      setError('Choose who can join, or tap All levels');
       return;
     }
     if (!userId) {
@@ -104,17 +154,21 @@ export default function CreateGroupScreen() {
 
     setLoading(true);
     try {
-      // Local file:// URIs aren't hosted yet — keep on device for demo, skip for live inserts.
       const coverForApi =
         coverUri && (isGuest || coverUri.startsWith('http')) ? coverUri : null;
+
+      const skillMin =
+        needsLevel && levelChoice && levelChoice !== 'all' ? levelChoice.min : null;
+      const skillMax =
+        needsLevel && levelChoice && levelChoice !== 'all' ? levelChoice.max : null;
 
       const group = await createGroup(userId, isGuest, {
         name,
         description,
         visibility,
-        location_label: location,
-        skill_level: needsLevel ? levelRange?.min ?? null : null,
-        skill_level_max: needsLevel ? levelRange?.max ?? null : null,
+        location_label: location.trim(),
+        skill_level: skillMin,
+        skill_level_max: skillMax,
         cover_url: coverForApi ?? (isGuest ? coverUri : null),
         ownerName: profile?.display_name?.trim() || 'You',
         inviteFriendIds: Array.from(inviteIds),
@@ -155,7 +209,14 @@ export default function CreateGroupScreen() {
         onChangeText={setName}
         placeholder="Thursday Night Padel"
         autoFocus
-        error={error && !error.toLowerCase().includes('level') ? error : undefined}
+        error={
+          error &&
+          !error.toLowerCase().includes('level') &&
+          !error.toLowerCase().includes('town') &&
+          !error.toLowerCase().includes('location')
+            ? error
+            : undefined
+        }
       />
       <TextField
         label="Description"
@@ -168,50 +229,43 @@ export default function CreateGroupScreen() {
 
       <Text style={styles.label}>Area</Text>
       <Text style={styles.help}>
-        Home base is South Spain — switch when you travel (Madrid, London, …).
+        Use your location or type any town / city — not limited to a fixed list.
       </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.hubRow}
+      <Pressable
+        style={[styles.locateBtn, locating && { opacity: 0.6 }]}
+        disabled={locating}
+        onPress={() => void useMyLocation()}
+        accessibilityRole="button"
+        accessibilityLabel="Use my location"
       >
-        {AREA_HUBS.map((hub) => {
-          const on = location.toLowerCase().includes(hub.label.toLowerCase());
-          return (
-            <Pressable
-              key={hub.id}
-              onPress={() => {
-                void select();
-                setLocation(hub.label);
-              }}
-              style={[styles.hubChip, on && styles.hubChipOn]}
-            >
-              <Text style={[styles.hubText, on && styles.hubTextOn]}>{hub.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        <Icon icon={LocateFixed} color={colors.accentGreen} size="sm" />
+        <Text style={styles.locateText}>
+          {locating ? 'Finding you…' : 'Use my location'}
+        </Text>
+      </Pressable>
       <TextField
-        label="Or type a place"
+        label="Town or city"
         value={location}
         onChangeText={setLocation}
-        placeholder="Sotogrande"
+        placeholder="e.g. Marbella, Madrid, Buenos Aires"
+        autoCorrect={false}
       />
 
       <VisibilityPicker
         value={visibility}
         onChange={(next) => {
           setVisibility(next);
-          if (next === 'private') setLevelRange(null);
+          if (next === 'private') setLevelChoice(null);
         }}
       />
       {needsLevel ? (
         <LevelRangePicker
-          value={levelRange}
+          value={levelChoice}
           required
-          onChange={setLevelRange}
+          allowAll
+          onChange={setLevelChoice}
           label="Who can join"
-          help="Tap one level, or two ends for a band — e.g. Beginner through Intermediate."
+          help="All levels, one level, or a band — e.g. Beginner through Intermediate."
         />
       ) : null}
 
@@ -252,8 +306,6 @@ export default function CreateGroupScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Do not set paddingTop here — Screen adds header-safe padding; overriding it
-  // pulls content under the glass header.
   content: { gap: spacing.md },
   intro: {
     ...typography.body,
@@ -300,25 +352,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: -4,
   },
-  hubRow: { gap: 8, paddingVertical: 2 },
-  hubChip: {
+  locateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: radii.pill,
-    backgroundColor: colors.elevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  hubChipOn: {
-    borderColor: colors.accentGreen,
     backgroundColor: colors.accentGreenDim,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,46,0.4)',
   },
-  hubText: {
-    fontFamily: 'Figtree_600SemiBold',
+  locateText: {
+    fontFamily: 'Figtree_700Bold',
     fontSize: 13,
-    color: colors.textSecondary,
+    color: colors.accentGreen,
   },
-  hubTextOn: { color: colors.accentGreen },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
   friendsBlock: { gap: 8 },
   friendRow: {

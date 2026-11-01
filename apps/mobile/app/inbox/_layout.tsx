@@ -20,7 +20,7 @@ export default function InboxLayout() {
         headerShadowVisible: false,
         headerTitleAlign: 'center',
         headerBackVisible: false,
-        headerLeft: () => <HeaderBack fallbackHref="/(tabs)/profile" />,
+        headerLeft: () => <HeaderBack fallbackHref="/(tabs)/inbox" />,
         contentStyle: { backgroundColor: colors.background },
         animation: 'slide_from_right',
       }}

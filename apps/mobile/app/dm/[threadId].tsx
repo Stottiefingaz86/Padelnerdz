@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChatWallpaper } from '@/components/chat/ChatWallpaper';
 import { FlatSendIcon } from '@/components/FlatIcons';
 import { useAuth } from '@/lib/auth';
 import {
@@ -87,9 +88,11 @@ export default function DirectMessageScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={88}
       >
+        <ChatWallpaper>
         <FlatList
           ref={listRef}
           data={messages}
+          style={styles.listFlex}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
             styles.list,
@@ -135,6 +138,7 @@ export default function DirectMessageScreen() {
             <FlatSendIcon color="#0B0D10" size={20} />
           </Pressable>
         </View>
+        </ChatWallpaper>
       </KeyboardAvoidingView>
     </>
   );
@@ -142,6 +146,7 @@ export default function DirectMessageScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  listFlex: { flex: 1, backgroundColor: 'transparent' },
   banner: {
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,

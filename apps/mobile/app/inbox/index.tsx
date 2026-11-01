@@ -1,6 +1,6 @@
 import { colors, spacing } from '@padel-nerdz/config';
 import { Stack, router, useFocusEffect } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { MessageCircle, Search, UserPlus, UserRoundPlus } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
+import { Icon } from '@/components/Icon';
 import { HeaderBack } from '@/components/HeaderBack';
 import { useAuth } from '@/lib/auth';
 import { listMyDmThreads, type DmThread } from '@/lib/dm';
@@ -64,7 +65,7 @@ export default function InboxScreen() {
 
   const refresh = useCallback(async () => {
     const [r, threads] = await Promise.all([
-      listFriendRequests(),
+      listFriendRequests(isGuest),
       userId ? listMyDmThreads(userId, isGuest) : Promise.resolve([]),
     ]);
     setRequests(r);
@@ -93,7 +94,7 @@ export default function InboxScreen() {
         options={{
           title: 'Messages',
           headerBackVisible: false,
-          headerLeft: () => <HeaderBack fallbackHref="/(tabs)/profile" />,
+          headerLeft: () => <HeaderBack fallbackHref="/(tabs)/inbox" />,
           headerRight: () => (
             <Pressable
               onPress={() => {
@@ -104,12 +105,7 @@ export default function InboxScreen() {
               style={styles.headerIconBtn}
               accessibilityLabel="Friends and requests"
             >
-              <SymbolView
-                name={{ ios: 'person.badge.plus', android: 'person_add', web: 'person_add' }}
-                tintColor={colors.textPrimary}
-                size={22}
-                style={Platform.OS !== 'ios' ? { width: 22, height: 22 } : undefined}
-              />
+              <Icon icon={UserPlus} color={colors.textPrimary} size="md" />
               {requests.length > 0 ? (
                 <View style={styles.headerDot}>
                   <Text style={styles.headerDotText}>
@@ -135,12 +131,7 @@ export default function InboxScreen() {
           ListHeaderComponent={
             <View style={styles.listHead}>
               <View style={styles.searchWrap}>
-                <SymbolView
-                  name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
-                  tintColor={colors.textMuted}
-                  size={16}
-                  style={Platform.OS !== 'ios' ? { width: 16, height: 16 } : undefined}
-                />
+                <Icon icon={Search} color={colors.textMuted} size={16} />
                 <TextInput
                   value={query}
                   onChangeText={setQuery}
@@ -165,21 +156,12 @@ export default function InboxScreen() {
                   }}
                 >
                   <View style={styles.requestsAvatar}>
-                    <SymbolView
-                      name={{
-                        ios: 'person.crop.circle.badge.plus',
-                        android: 'person_add',
-                        web: 'person_add',
-                      }}
-                      tintColor={colors.accentGreen}
-                      size={22}
-                      style={Platform.OS !== 'ios' ? { width: 22, height: 22 } : undefined}
-                    />
+                    <Icon icon={UserRoundPlus} color={colors.accentGreen} size="md" />
                   </View>
                   <View style={styles.copy}>
-                    <Text style={styles.requestsTitle}>Friend requests</Text>
+                    <Text style={styles.requestsTitle}>Follow requests</Text>
                     <Text style={styles.requestsMeta}>
-                      {requests.length} pending · Approve or decline
+                      {requests.length} pending · Approve to unlock messaging
                     </Text>
                   </View>
                   <View style={styles.requestsBadge}>
@@ -205,19 +187,19 @@ export default function InboxScreen() {
                         style={styles.accept}
                         onPress={() => {
                           void tap();
-                          void acceptFriendRequest(req.id).then(refresh);
+                          void acceptFriendRequest(req.id, isGuest).then(refresh);
                         }}
                       >
-                        <Text style={styles.acceptText}>Confirm</Text>
+                        <Text style={styles.acceptText}>Approve</Text>
                       </Pressable>
                       <Pressable
                         style={styles.decline}
                         onPress={() => {
                           void tap();
-                          void declineFriendRequest(req.id).then(refresh);
+                          void declineFriendRequest(req.id, isGuest).then(refresh);
                         }}
                       >
-                        <Text style={styles.declineText}>Delete</Text>
+                        <Text style={styles.declineText}>Decline</Text>
                       </Pressable>
                     </View>
                   ))
@@ -227,16 +209,7 @@ export default function InboxScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <SymbolView
-                  name={{
-                    ios: 'bubble.left.and.bubble.right',
-                    android: 'chat',
-                    web: 'chat',
-                  }}
-                  tintColor={colors.textMuted}
-                  size={36}
-                  style={Platform.OS !== 'ios' ? { width: 36, height: 36 } : undefined}
-                />
+                <Icon icon={MessageCircle} color={colors.textMuted} size={36} />
               </View>
               <Text style={styles.emptyTitle}>Your messages</Text>
               <Text style={styles.emptyBody}>

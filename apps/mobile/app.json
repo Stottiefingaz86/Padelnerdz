@@ -13,7 +13,7 @@
       "infoPlist": {
         "NSContactsUsageDescription": "Padel Nerdz uses your contacts so you can invite padel friends like WhatsApp.",
         "NSPhotoLibraryUsageDescription": "Padel Nerdz lets you share padel photos and videos in session chat.",
-        "NSCameraUsageDescription": "Padel Nerdz lets you capture moments to share in session chat.",
+        "NSCameraUsageDescription": "Padel Nerdz uses the camera to scan player check-in tickets and share session moments.",
         "NSLocationWhenInUseUsageDescription": "Padel Nerdz uses your location to show padel groups near you.",
         "NSFaceIDUsageDescription": "Padel Nerdz can lock the app behind Face ID so only you open your chats and mix-ins.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -32,6 +32,7 @@
       "package": "com.padelnerdz.app",
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "CAMERA",
         "READ_CONTACTS",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
@@ -41,9 +42,6 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
       ]
-    },
-    "notification": {
-      "color": "#C8FF2E"
     },
     "web": {
       "bundler": "metro",
@@ -71,7 +69,16 @@
         "expo-image-picker",
         {
           "photosPermission": "Padel Nerdz lets you share padel photos and videos in session chat.",
-          "cameraPermission": "Padel Nerdz lets you capture moments to share in session chat."
+          "cameraPermission": "Padel Nerdz uses the camera to scan player check-in tickets and share session moments."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Padel Nerdz uses the camera to scan player check-in tickets at the courts.",
+          "microphonePermission": "Padel Nerdz needs the microphone only if you record video in chat.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
         }
       ],
       "@react-native-community/datetimepicker",
@@ -90,7 +97,21 @@
           "sounds": []
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Padel Nerdz can lock the app behind Face ID so only you open your chats and mix-ins."
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.padelnerdz.app",
+          "enableGooglePay": false
+        }
+      ],
+      "./plugins/withStripeAndroidFix.js"
     ],
     "experiments": {
       "typedRoutes": true

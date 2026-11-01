@@ -19,6 +19,7 @@ Create a polished mobile app for padel communities that feels socially alive, hi
 - Prefer native-feeling navigation and components.
 - Keep typography, spacing, and controls premium and consistent.
 - Avoid overloaded dashboards inside the consumer app.
+- **Icons:** use Lucide only via `apps/mobile/components/Icon.tsx` + `lucide-react-native`. Do not use `expo-symbols`, emoji, or hand-drawn View glyphs for UI icons. Browse https://lucide.dev/icons — prefer clear, labeled actions for 60+ usability.
 
 ## Architecture rules
 - Separate chat infrastructure from padel domain logic.

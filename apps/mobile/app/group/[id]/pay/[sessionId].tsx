@@ -4,25 +4,29 @@ import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useCelebration } from '@/components/CelebrationHost';
+import { presentFreshUnlocks, syncAchievementsFromStats } from '@/lib/achievements';
 import { useAuth } from '@/lib/auth';
 import { paymentSuccess, tap, warn } from '@/lib/feedback';
 import { recordPaymentClaim } from '@/lib/owner-metrics';
 import {
+  createStripePaymentIntent,
   getGroupPaymentSettings,
-  openPaymentDestination,
-  paymentMethodLabel,
+  isStripePayoutReady,
+  stripeMerchantDisplayName,
+  stripePublishableKey,
+  waitForStripePaymentUnlock,
   type GroupPaymentSettings,
 } from '@/lib/payments';
 import { formatMoney, PLATFORM_FEE_CENTS, priceBreakdown } from '@/lib/pricing';
-import {
-  claimSessionPayment,
-  getSession,
-  type SessionSummary,
-} from '@/lib/sessions';
+import { ensurePaidSessionRoomAccess, getSession, type SessionSummary } from '@/lib/sessions';
+import { useStripePay } from '@/lib/stripe-pay';
 
 export default function PayScreen() {
   const { id, sessionId } = useLocalSearchParams<{ id: string; sessionId: string }>();
   const { profile, user, offline } = useAuth();
+  const { celebrate } = useCelebration();
+  const stripePay = useStripePay();
   const isGuest = offline;
   const userId = user?.id ?? profile?.id ?? '';
   const displayName = profile?.display_name?.trim() || 'Player';
@@ -59,45 +63,96 @@ export default function PayScreen() {
     session?.commission_cents ?? PLATFORM_FEE_CENTS,
   );
   const amount = formatMoney(breakdown.playerTotalCents);
+  const stripeReady = settings ? isStripePayoutReady(settings) : false;
+  const stripeConfigured = Boolean(stripePublishableKey());
 
-  async function openPayApp() {
-    if (!settings) return;
-    void tap();
-    const result = await openPaymentDestination(settings, amount);
-    if (result === 'missing') {
-      void warn();
-      setError(
-        settings.preferred_method === 'revolut'
-          ? 'Organiser hasn’t added a Revolut.me code yet.'
-          : settings.preferred_method === 'bizum'
-            ? 'Organiser hasn’t added a Bizum phone number yet.'
-            : 'Card checkout isn’t live yet — ask the organiser for another method.',
-      );
-    }
-  }
-
-  async function markPaid() {
+  async function onPay() {
     if (!id || !sessionId || !userId) return;
+    if (!stripePay.supported) {
+      setError('Pay on the iOS or Android app — Stripe isn’t available in the browser.');
+      return;
+    }
+    if (!stripeConfigured) {
+      setError('Payments aren’t configured yet (missing Stripe publishable key).');
+      return;
+    }
+    if (!stripeReady) {
+      setError(
+        'Organiser hasn’t finished payout setup. Ask them to connect their bank in Admin → Payments.',
+      );
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      await claimSessionPayment({
+      void tap();
+      const intent = await createStripePaymentIntent({
         sessionId,
         groupId: id,
-        userId,
-        displayName,
         isGuest,
       });
+
+      const { error: initError } = await stripePay.initPaymentSheet({
+        merchantDisplayName: stripeMerchantDisplayName(),
+        paymentIntentClientSecret: intent.clientSecret,
+        allowsDelayedPaymentMethods: false,
+        returnURL: `padelnerdz://stripe-redirect`,
+        defaultBillingDetails: {
+          name: displayName,
+        },
+      });
+      if (initError) throw new Error(initError.message);
+
+      const { error: presentError } = await stripePay.presentPaymentSheet();
+      if (presentError) {
+        if (presentError.code === 'Canceled') {
+          setBusy(false);
+          return;
+        }
+        throw new Error(presentError.message);
+      }
+
       recordPaymentClaim({
         sessionId,
         groupId: id,
-        method: settings?.preferred_method ?? 'manual',
+        method: 'stripe',
       });
+
+      const unlocked = await waitForStripePaymentUnlock({
+        sessionId,
+        userId,
+      });
+
+      // Ensure session chat unlocks even if we send the player to the confirm screen first.
+      if (!unlocked.sessionRoomId) {
+        await ensurePaidSessionRoomAccess({
+          sessionId,
+          userId,
+          isGuest,
+        });
+      }
+
       await paymentSuccess();
+      celebrate({
+        mark: 'PN',
+        tier: 'gold',
+        title: 'You’re in',
+        body: 'Place confirmed — grab your ticket or add this to your calendar.',
+      });
+
+      const freshMissions = await syncAchievementsFromStats({ mixinsPlayed: 1 });
+      if (freshMissions.length) {
+        setTimeout(() => {
+          void presentFreshUnlocks(freshMissions, celebrate);
+        }, 3200);
+      }
+
+      // Land on confirm screen so ticket QR + calendar are right there once paid.
       router.replace(`/group/${id}/session/${sessionId}`);
     } catch (e) {
       void warn();
-      setError(e instanceof Error ? e.message : 'Could not submit payment claim');
+      setError(e instanceof Error ? e.message : 'Payment failed');
     } finally {
       setBusy(false);
     }
@@ -111,9 +166,6 @@ export default function PayScreen() {
     );
   }
 
-  const method = settings?.preferred_method ?? 'revolut';
-  const methodTitle = paymentMethodLabel(method);
-
   return (
     <>
       <Stack.Screen options={{ title: 'Confirm place', headerBackTitle: 'Chat' }} />
@@ -122,97 +174,51 @@ export default function PayScreen() {
           <Text style={styles.kicker}>PAYMENT</Text>
           <Text style={styles.title}>{session?.title ?? 'Mix-in'}</Text>
           <Text style={styles.amount}>{amount}</Text>
+          <Text style={styles.amountHint}>
+            {stripePay.supported
+              ? 'One total · card / Apple Pay / Google Pay'
+              : 'Browser preview — pay in the mobile app'}
+          </Text>
         </View>
 
         <View style={styles.guide}>
-          <Text style={styles.guideTitle}>How to pay</Text>
-          {method === 'revolut' ? (
-            <>
-              <Text style={styles.step}>
-                1. Tap <Text style={styles.em}>Open Revolut</Text> — that opens the organiser’s
-                Revolut.me page
-                {settings?.revolut_me_code
-                  ? ` (revolut.me/${settings.revolut_me_code})`
-                  : ''}
-                .
-              </Text>
-              <Text style={styles.step}>
-                2. Send exactly <Text style={styles.em}>{amount}</Text>
-                {settings?.payment_note ? ` — ${settings.payment_note}` : ' (add the mix-in name in the reference if you can)'}.
-              </Text>
-              <Text style={styles.step}>
-                3. Come back here and tap <Text style={styles.em}>I’ve paid</Text>.
-              </Text>
-              <Text style={styles.step}>
-                4. Wait for the organiser to confirm they received it in Revolut — session chat
-                unlocks after that.
-              </Text>
-            </>
-          ) : method === 'bizum' ? (
-            <>
-              <Text style={styles.step}>
-                1. Tap <Text style={styles.em}>Share Bizum details</Text> to copy the organiser’s
-                number
-                {settings?.bizum_phone ? ` (${settings.bizum_phone})` : ''}.
-              </Text>
-              <Text style={styles.step}>
-                2. Open your bank / Bizum app and send exactly{' '}
-                <Text style={styles.em}>{amount}</Text> to that number.
-              </Text>
-              <Text style={styles.step}>
-                3. Return here and tap <Text style={styles.em}>I’ve paid</Text>.
-              </Text>
-              <Text style={styles.step}>
-                4. Organiser verifies the transfer — then session chat unlocks.
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.step}>Card checkout isn’t available yet. Ask the organiser.</Text>
-          )}
+          <Text style={styles.guideTitle}>How it works</Text>
+          <Text style={styles.step}>
+            1. Tap <Text style={styles.em}>Pay {amount}</Text> — Stripe opens a secure sheet.
+          </Text>
+          <Text style={styles.step}>
+            2. Pay with card, Apple Pay, or Google Pay (when enabled on your device).
+          </Text>
+          <Text style={styles.step}>
+            3. Your place unlocks instantly. The organiser gets the court share; Padel Nerdz keeps
+            the service fee automatically.
+          </Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Pay with</Text>
-          <Text style={styles.cardMethod}>{methodTitle}</Text>
-          {method === 'revolut' ? (
-            <Text style={styles.cardMeta}>
-              {settings?.revolut_me_code
-                ? `revolut.me/${settings.revolut_me_code}`
-                : 'No Revolut.me code set by organiser'}
+        {!stripeReady ? (
+          <View style={styles.warnBox}>
+            <Text style={styles.warnTitle}>Payouts not ready</Text>
+            <Text style={styles.warnBody}>
+              The organiser still needs to connect their bank in Admin → Payments before you can
+              pay.
             </Text>
-          ) : null}
-          {method === 'bizum' ? (
-            <Text style={styles.cardMeta}>
-              {settings?.bizum_phone
-                ? `${settings.bizum_phone}${settings.bizum_name ? ` · ${settings.bizum_name}` : ''}`
-                : 'No Bizum number set by organiser'}
-            </Text>
-          ) : null}
-          {settings?.payment_note ? (
-            <Text style={styles.note}>{settings.payment_note}</Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <View style={styles.actions}>
-          <Pressable style={styles.primary} onPress={() => void openPayApp()}>
-            <Text style={styles.primaryText}>
-              {method === 'revolut'
-                ? 'Open Revolut'
-                : method === 'bizum'
-                  ? 'Share Bizum details'
-                  : 'Payment method unavailable'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.secondary, busy && { opacity: 0.5 }]}
-            onPress={() => void markPaid()}
-            disabled={busy}
-          >
-            <Text style={styles.secondaryText}>{busy ? 'Submitting…' : 'I’ve paid'}</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          style={[
+            styles.primary,
+            (busy || !stripeReady || !stripeConfigured || !stripePay.supported) && { opacity: 0.5 },
+          ]}
+          onPress={() => void onPay()}
+          disabled={busy || !stripeReady || !stripeConfigured || !stripePay.supported}
+        >
+          <Text style={styles.primaryText}>
+            {busy ? 'Processing…' : stripePay.supported ? `Pay ${amount}` : 'Pay in the app'}
+          </Text>
+        </Pressable>
       </Screen>
     </>
   );
@@ -246,6 +252,11 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     marginTop: 4,
   },
+  amountHint: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 13,
+    color: colors.textMuted,
+  },
   guide: {
     gap: 8,
     padding: spacing.md,
@@ -270,59 +281,36 @@ const styles = StyleSheet.create({
     fontFamily: 'Figtree_700Bold',
     color: colors.textPrimary,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+  warnBox: {
     padding: spacing.md,
-    gap: 4,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(255,183,77,0.4)',
+    gap: 6,
   },
-  cardLabel: {
-    fontFamily: 'Figtree_600SemiBold',
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  cardMethod: {
+  warnTitle: {
     fontFamily: 'Figtree_700Bold',
-    fontSize: 22,
-    color: colors.textPrimary,
-  },
-  cardMeta: {
-    fontFamily: 'Figtree_400Regular',
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.warning,
   },
-  note: {
-    marginTop: 8,
+  warnBody: {
     fontFamily: 'Figtree_400Regular',
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 18,
   },
-  actions: { gap: 10, marginTop: spacing.sm },
   primary: {
     minHeight: 52,
     borderRadius: 26,
     backgroundColor: colors.accentGreen,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: spacing.sm,
   },
   primaryText: {
     fontFamily: 'Figtree_700Bold',
     color: '#0B0D10',
-    fontSize: 16,
-  },
-  secondary: {
-    minHeight: 52,
-    borderRadius: 26,
-    backgroundColor: colors.elevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryText: {
-    fontFamily: 'Figtree_700Bold',
-    color: colors.textPrimary,
     fontSize: 16,
   },
   error: {

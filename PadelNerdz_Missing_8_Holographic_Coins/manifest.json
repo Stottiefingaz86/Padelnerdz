@@ -1,0 +1,42 @@
+[
+  {
+    "id": "first_group",
+    "file": "first_group.png",
+    "tier": "bronze"
+  },
+  {
+    "id": "groups_3",
+    "file": "groups_3.png",
+    "tier": "silver"
+  },
+  {
+    "id": "group_rank_1",
+    "file": "group_rank_1.png",
+    "tier": "platinum"
+  },
+  {
+    "id": "reliable_5",
+    "file": "reliable_5.png",
+    "tier": "silver"
+  },
+  {
+    "id": "comeback",
+    "file": "comeback.png",
+    "tier": "bronze"
+  },
+  {
+    "id": "host_first",
+    "file": "host_first.png",
+    "tier": "bronze"
+  },
+  {
+    "id": "host_5",
+    "file": "host_5.png",
+    "tier": "gold"
+  },
+  {
+    "id": "most_improved",
+    "file": "most_improved.png",
+    "tier": "gold"
+  }
+]

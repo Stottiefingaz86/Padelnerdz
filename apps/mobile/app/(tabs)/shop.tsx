@@ -1,8 +1,9 @@
 import { colors, radii, spacing } from '@padel-nerdz/config';
-import { SymbolView } from 'expo-symbols';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Lock } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/Icon';
 import { NERDZ_MERCH } from '@/lib/shop';
 
 const KIND_MARK: Record<(typeof NERDZ_MERCH)[number]['kind'], string> = {
@@ -51,12 +52,7 @@ export default function ShopScreen() {
           ))}
         </View>
         <View style={styles.lockOverlay}>
-          <SymbolView
-            name={{ ios: 'lock.fill', android: 'lock', web: 'lock' }}
-            tintColor={colors.accentGreen}
-            size={28}
-            style={Platform.OS !== 'ios' ? { width: 28, height: 28 } : undefined}
-          />
+          <Icon icon={Lock} color={colors.accentGreen} size="xl" />
           <Text style={styles.lockTitle}>Coming soon</Text>
           <Text style={styles.lockBody}>We’ll unlock Shop when merch and partners go live.</Text>
         </View>

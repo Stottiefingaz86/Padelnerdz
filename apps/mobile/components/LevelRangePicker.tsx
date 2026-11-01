@@ -16,14 +16,19 @@ export type LevelRange = {
   max: Exclude<OrganiserLevel, 'unknown'>;
 };
 
+/** `null` = not chosen yet; `'all'` = every level welcome */
+export type LevelChoice = LevelRange | 'all' | null;
+
 type Props = {
-  value: LevelRange | null;
-  onChange: (value: LevelRange) => void;
+  value: LevelChoice;
+  onChange: (value: LevelChoice) => void;
   label?: string;
   help?: string;
   required?: boolean;
   /** Single claimed level (profile) — still uses range UI with min=max */
   single?: boolean;
+  /** Show an All levels chip (public / approval groups) */
+  allowAll?: boolean;
 };
 
 function inRange(level: OrganiserLevel, range: LevelRange | null) {
@@ -32,7 +37,8 @@ function inRange(level: OrganiserLevel, range: LevelRange | null) {
   return r >= levelRank(range.min) && r <= levelRank(range.max);
 }
 
-export function formatLevelRange(range: LevelRange | null | undefined) {
+export function formatLevelRange(range: LevelChoice | undefined) {
+  if (range === 'all') return 'All levels';
   if (!range) return 'Any level';
   if (range.min === range.max) return levelLabel(range.min);
   return `${levelLabel(range.min)} – ${levelLabel(range.max)}`;
@@ -45,28 +51,32 @@ export function LevelRangePicker({
   help = 'Tap two ends to set a band — e.g. Beginner through Intermediate.',
   required,
   single,
+  allowAll,
 }: Props) {
+  const rangeValue: LevelRange | null =
+    value && value !== 'all' ? value : null;
+  const allSelected = value === 'all';
+
   function toggle(level: Exclude<OrganiserLevel, 'unknown'>) {
     void select();
-    if (single || !value) {
+    if (single || !rangeValue) {
       onChange({ min: level, max: level });
       return;
     }
     const tapped = levelRank(level);
-    const minR = levelRank(value.min);
-    const maxR = levelRank(value.max);
-    if (value.min === value.max && value.min === level) {
+    const minR = levelRank(rangeValue.min);
+    const maxR = levelRank(rangeValue.max);
+    if (rangeValue.min === rangeValue.max && rangeValue.min === level) {
       return;
     }
     if (tapped <= minR) {
-      onChange({ min: level, max: value.max });
+      onChange({ min: level, max: rangeValue.max });
       return;
     }
     if (tapped >= maxR) {
-      onChange({ min: value.min, max: level });
+      onChange({ min: rangeValue.min, max: level });
       return;
     }
-    // Inside existing band → shrink to that single level
     onChange({ min: level, max: level });
   }
 
@@ -78,8 +88,23 @@ export function LevelRangePicker({
       </Text>
       <Text style={styles.help}>{help}</Text>
       <View style={styles.row}>
+        {allowAll ? (
+          <Pressable
+            onPress={() => {
+              void select();
+              onChange('all');
+            }}
+            style={[styles.chip, allSelected && styles.chipOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: allSelected }}
+          >
+            <Text style={[styles.chipText, allSelected && styles.chipTextOn]}>
+              All levels
+            </Text>
+          </Pressable>
+        ) : null}
         {ORDER.map((level) => {
-          const selected = inRange(level, value);
+          const selected = !allSelected && inRange(level, rangeValue);
           return (
             <Pressable
               key={level}
@@ -93,9 +118,7 @@ export function LevelRangePicker({
           );
         })}
       </View>
-      {value ? (
-        <Text style={styles.summary}>{formatLevelRange(value)}</Text>
-      ) : null}
+      {value ? <Text style={styles.summary}>{formatLevelRange(value)}</Text> : null}
     </View>
   );
 }

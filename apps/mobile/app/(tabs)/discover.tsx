@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -18,7 +19,7 @@ import { useCelebration } from '@/components/CelebrationHost';
 import { FlatFilterIcon, FlatLocateIcon } from '@/components/FlatIcons';
 import { VisualEmpty } from '@/components/VisualEmpty';
 import { useAuth } from '@/lib/auth';
-import { syncAchievementsFromStats } from '@/lib/achievements';
+import { presentFreshUnlocks, syncAchievementsFromStats } from '@/lib/achievements';
 import { getGuestSkillLevel, subscribeDemoStore } from '@/lib/demo-store';
 import { select, success, tap, warn } from '@/lib/feedback';
 import {
@@ -36,6 +37,7 @@ import {
   nearestHub,
   setCurrentAreaHub,
 } from '@/lib/locations';
+import { resolveMediaDisplayUrl } from '@/lib/media';
 
 const RADII: { id: number | null; label: string }[] = [
   { id: 5, label: '5 km' },
@@ -60,6 +62,7 @@ export default function DiscoverScreen() {
   const userId = user?.id ?? profile?.id ?? '';
 
   const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const [coverById, setCoverById] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +83,15 @@ export default function DiscoverScreen() {
       try {
         const hub = viewerHub ?? (await getCurrentAreaHub());
         setHubId(hub);
-        setGroups(await listDiscoverableGroups(userId, isGuest, hub));
+        const next = await listDiscoverableGroups(userId, isGuest, hub);
+        setGroups(next);
+        const covers = await Promise.all(
+          next.map(async (g) => {
+            const raw = g.cover_url || g.avatar_url;
+            return [g.id, await resolveMediaDisplayUrl(raw)] as const;
+          }),
+        );
+        setCoverById(Object.fromEntries(covers));
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not load discover feed');
       } finally {
@@ -105,7 +116,15 @@ export default function DiscoverScreen() {
   useEffect(() => {
     if (!userId) return;
     void (async () => {
-      setGroups(await listDiscoverableGroups(userId, isGuest, activeHubId));
+      const next = await listDiscoverableGroups(userId, isGuest, activeHubId);
+      setGroups(next);
+      const covers = await Promise.all(
+        next.map(async (g) => {
+          const raw = g.cover_url || g.avatar_url;
+          return [g.id, await resolveMediaDisplayUrl(raw)] as const;
+        }),
+      );
+      setCoverById(Object.fromEntries(covers));
     })();
   }, [activeHubId, userId, isGuest]);
 
@@ -195,11 +214,16 @@ export default function DiscoverScreen() {
         mixinsPlayed: 0,
         joinedGroup: true,
       });
-      celebrate({
-        mark: unlocked[0]?.mark ?? 'G',
-        title: unlocked[0]?.title ?? 'You’re in!',
-        body: unlocked[0]?.body ?? `Welcome to ${group.name}. Say hi in the chat.`,
-      });
+      if (unlocked.length) {
+        await presentFreshUnlocks(unlocked, celebrate);
+      } else {
+        celebrate({
+          mark: 'G',
+          tier: 'bronze',
+          title: 'You’re in!',
+          body: `Welcome to ${group.name}. Say hi in the chat.`,
+        });
+      }
       setTimeout(() => router.push(`/group/${group.id}/chat`), 900);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not join';
@@ -328,7 +352,7 @@ export default function DiscoverScreen() {
               <VisualEmpty
                 image={require('../../assets/images/empty/discover-hero.jpg')}
                 imageFit="cover"
-                heroHeight={160}
+                heroAspectRatio={16 / 9}
                 kicker="NEAR YOU"
                 title="No groups here"
                 body="Try another city (Madrid, Buenos Aires…), widen the radius, or create a public group."
@@ -362,6 +386,7 @@ export default function DiscoverScreen() {
           const cta = item.visibility === 'approval' ? 'Request to join' : 'Join Group';
           const milesLabel =
             item.distance_miles != null ? `${item.distance_miles.toFixed(1)} km` : null;
+          const coverUri = coverById[item.id];
           return (
             <Pressable
               style={styles.card}
@@ -370,40 +395,50 @@ export default function DiscoverScreen() {
                 router.push(`/group/${item.id}`);
               }}
             >
-              <View style={styles.cardTop}>
-                <View style={styles.cardAvatar}>
-                  <Text style={styles.cardAvatarText}>{item.name.slice(0, 1).toUpperCase()}</Text>
-                </View>
-                <View style={styles.cardCopy}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.cardMeta} numberOfLines={2}>
-                    {[
-                      formatGroupLevelBand(item.skill_level, item.skill_level_max),
-                      milesLabel,
-                      item.location_label,
-                      `${item.member_count} members`,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                </View>
+              <View style={styles.cardMedia}>
+                {coverUri ? (
+                  <Image
+                    source={{ uri: coverUri }}
+                    style={styles.cardCover}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.cardCoverFallback}>
+                    <Text style={styles.cardCoverInitial}>
+                      {item.name.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
               </View>
-              {item.description ? (
-                <Text style={styles.cardDesc} numberOfLines={2}>
-                  {item.description}
+              <View style={styles.cardBody}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {item.name}
                 </Text>
-              ) : null}
-              <Pressable
-                style={styles.joinBtn}
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  void onJoin(item);
-                }}
-              >
-                <Text style={styles.joinBtnText}>{joiningId === item.id ? '…' : cta}</Text>
-              </Pressable>
+                <Text style={styles.cardMeta} numberOfLines={2}>
+                  {[
+                    formatGroupLevelBand(item.skill_level, item.skill_level_max),
+                    milesLabel,
+                    item.location_label,
+                    `${item.member_count} members`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+                {item.description ? (
+                  <Text style={styles.cardDesc} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                ) : null}
+                <Pressable
+                  style={styles.joinBtn}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    void onJoin(item);
+                  }}
+                >
+                  <Text style={styles.joinBtnText}>{joiningId === item.id ? '…' : cta}</Text>
+                </Pressable>
+              </View>
             </Pressable>
           );
         }}
@@ -567,28 +602,37 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: spacing.md,
     marginBottom: 12,
-    padding: 14,
     borderRadius: radii.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    gap: 10,
+    overflow: 'hidden',
   },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.elevated2,
+  cardMedia: {
+    width: '100%',
+    height: 148,
+    backgroundColor: colors.elevated,
+  },
+  cardCover: {
+    width: '100%',
+    height: '100%',
+  },
+  cardCoverFallback: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#1F3A2E',
   },
-  cardAvatarText: {
+  cardCoverInitial: {
     fontFamily: 'Figtree_700Bold',
     color: colors.accentGreen,
-    fontSize: 20,
+    fontSize: 36,
   },
-  cardCopy: { flex: 1, minWidth: 0, gap: 3 },
+  cardBody: {
+    padding: 14,
+    gap: 8,
+  },
   cardTitle: {
     fontFamily: 'Figtree_700Bold',
     color: colors.textPrimary,
@@ -608,6 +652,7 @@ const styles = StyleSheet.create({
   },
   joinBtn: {
     minHeight: 44,
+    marginTop: 2,
     borderRadius: radii.pill,
     backgroundColor: colors.accentGreen,
     alignItems: 'center',

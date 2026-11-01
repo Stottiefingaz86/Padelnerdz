@@ -3,20 +3,22 @@ import { Screen } from '@padel-nerdz/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { useCallback, useState, type ComponentProps } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { AppButton } from '@/components/AppButton';
 import { BrandLogo } from '@/components/BrandLogo';
+import { useCelebration } from '@/components/CelebrationHost';
 import { LevelRangePicker, type LevelRange } from '@/components/LevelRangePicker';
+import { MedalBadge } from '@/components/MedalBadge';
 import { WinLossSparkline } from '@/components/WinLossSparkline';
 import { useAuth } from '@/lib/auth';
 import {
   listAchievements,
+  presentFreshUnlocks,
   syncAchievementsFromStats,
-  type AchievementDef,
+  type MissionProgress,
 } from '@/lib/achievements';
 import {
   getGuestAvatarUrl,
@@ -26,8 +28,7 @@ import {
   subscribeDemoStore,
 } from '@/lib/demo-store';
 import { select, success, tap } from '@/lib/feedback';
-import { countInboxBadge } from '@/lib/dm';
-import { listFriendRequests, subscribeFriends } from '@/lib/friends';
+import { subscribeFriends } from '@/lib/friends';
 import { levelLabel, type OrganiserLevel } from '@/lib/groups';
 import { getOverallPlayerStats, type OverallPlayerStats } from '@/lib/player-stats';
 import {
@@ -37,6 +38,7 @@ import {
 
 export default function ProfileScreen() {
   const { profile, configured, signOut, updateGuestProfile , offline } = useAuth();
+  const { celebrate } = useCelebration();
   const isGuest = offline;
   const userId = profile?.id ?? '';
   const initial = (profile?.display_name ?? 'P').slice(0, 1).toUpperCase();
@@ -48,36 +50,29 @@ export default function ProfileScreen() {
     isGuest ? getGuestSkillLevel() : 'intermediate',
   );
   const [stats, setStats] = useState<OverallPlayerStats | null>(null);
-  const [achievements, setAchievements] = useState<
-    (AchievementDef & { unlockedAt: string | null })[]
-  >([]);
+  const [achievements, setAchievements] = useState<MissionProgress[]>([]);
   const [history, setHistory] = useState<MixinHistoryItem[]>([]);
-  const [inboxCount, setInboxCount] = useState(0);
-
   const refresh = useCallback(async () => {
     if (!userId) return;
     const nextStats = await getOverallPlayerStats(userId, isGuest);
     setStats(nextStats);
     const hist = await listMyMixinHistory(userId, isGuest);
     setHistory(hist);
-    await syncAchievementsFromStats({
+    const fresh = await syncAchievementsFromStats({
       mixinsPlayed: Math.max(nextStats.sessionsPlayed, hist.length),
       groupRank: nextStats.bestFinish === 1 ? 1 : null,
       isWinner: nextStats.bestFinish === 1,
       improved: Boolean(nextStats.suggestion?.toLowerCase().includes('outperforming')),
     });
-    setAchievements(await listAchievements());
-    try {
-      const reqs = await listFriendRequests();
-      setInboxCount(await countInboxBadge(userId, isGuest, reqs.length));
-    } catch {
-      setInboxCount(0);
+    if (fresh.length) {
+      void presentFreshUnlocks(fresh, celebrate);
     }
+    setAchievements(await listAchievements());
     if (isGuest) {
       setClaimed(getGuestSkillLevel());
       setAvatarUri(getGuestAvatarUrl() ?? profile?.avatar_url ?? null);
     }
-  }, [userId, isGuest, profile?.avatar_url]);
+  }, [userId, isGuest, profile?.avatar_url, celebrate]);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,8 +106,9 @@ export default function ProfileScreen() {
     void success();
   }
 
-  function onClaimLevel(range: LevelRange) {
-    const level = range.min;
+  function onClaimLevel(choice: LevelRange | 'all' | null) {
+    if (!choice || choice === 'all') return;
+    const level = choice.min;
     setClaimed(level);
     if (isGuest) setGuestSkillLevel(level);
     void success();
@@ -137,36 +133,6 @@ export default function ProfileScreen() {
     <Screen scroll contentStyle={styles.content}>
       <Animated.View entering={FadeInDown.duration(280)} style={styles.topBar}>
         <BrandLogo size="md" />
-        <Pressable
-          style={styles.inboxBtn}
-          onPress={() => {
-            void select();
-            router.push('/inbox');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={
-            inboxCount > 0 ? `Messages, ${inboxCount} new` : 'Messages'
-          }
-          hitSlop={8}
-        >
-          <SymbolView
-            name={{
-              ios: 'paperplane.fill',
-              android: 'send',
-              web: 'send',
-            }}
-            tintColor={colors.textPrimary}
-            size={24}
-            style={Platform.OS !== 'ios' ? { width: 24, height: 24 } : undefined}
-          />
-          {inboxCount > 0 ? (
-            <View style={styles.inboxBadge}>
-              <Text style={styles.inboxBadgeText}>
-                {inboxCount > 9 ? '9+' : inboxCount}
-              </Text>
-            </View>
-          ) : null}
-        </Pressable>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(40).duration(280)} style={styles.heroCard}>
@@ -305,28 +271,39 @@ export default function ProfileScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(90).duration(280)} style={styles.statsCard}>
-        <Text style={styles.sectionTitle}>Achievements</Text>
-        <Text style={styles.journeySub}>Your padel journey medals — unlock as you play.</Text>
+        <Text style={styles.sectionTitle}>Missions</Text>
+        <Text style={styles.journeySub}>
+          Medals for firsts, volume, wins, hosting, and reliability — progress as you play.
+        </Text>
         <View style={styles.achieveGrid}>
           {achievements.map((a) => {
             const on = Boolean(a.unlockedAt);
-            const tint = on ? colors.accentGreen : colors.textMuted;
             return (
               <View key={a.id} style={[styles.achieve, !on && styles.achieveLocked]}>
-                <View style={[styles.achieveBadge, on && styles.achieveBadgeOn]}>
-                  <SymbolView
-                    name={a.symbol as ComponentProps<typeof SymbolView>['name']}
-                    tintColor={tint}
-                    size={22}
-                    style={Platform.OS !== 'ios' ? { width: 22, height: 22 } : undefined}
-                    fallback={
-                      <Text style={[styles.achieveMark, { color: tint }]}>{a.mark}</Text>
-                    }
-                  />
-                </View>
+                <MedalBadge
+                  mark={a.mark}
+                  tier={a.tier}
+                  unlocked={on}
+                  size="md"
+                  achievementId={a.id}
+                />
                 <Text style={[styles.achieveTitle, !on && styles.achieveMuted]} numberOfLines={2}>
                   {a.title}
                 </Text>
+                {!on ? (
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[styles.progressFill, { width: `${Math.round(a.progress * 100)}%` }]}
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.progressDone}>Unlocked</Text>
+                )}
+                {!on ? (
+                  <Text style={styles.progressLabel}>
+                    {a.current}/{a.target}
+                  </Text>
+                ) : null}
               </View>
             );
           })}
@@ -451,36 +428,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   content: { gap: spacing.lg, paddingBottom: spacing.xxl },
   topBar: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingTop: spacing.sm,
-    gap: spacing.md,
-  },
-  inboxBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inboxBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 0,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
-    backgroundColor: colors.accentGreen,
-    borderWidth: 2,
-    borderColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inboxBadgeText: {
-    fontFamily: 'Figtree_700Bold',
-    fontSize: 10,
-    color: '#0B0D10',
   },
   heroCard: {
     backgroundColor: colors.elevated,
@@ -746,26 +696,7 @@ const styles = StyleSheet.create({
   },
   achieveLocked: {
     borderColor: colors.borderSubtle,
-    opacity: 0.55,
-  },
-  achieveBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-  },
-  achieveBadgeOn: {
-    backgroundColor: 'rgba(200,255,46,0.12)',
-    borderColor: 'rgba(200,255,46,0.4)',
-  },
-  achieveMark: {
-    fontFamily: 'Figtree_700Bold',
-    fontSize: 13,
-    letterSpacing: 0.2,
+    opacity: 0.92,
   },
   achieveTitle: {
     fontFamily: 'Figtree_700Bold',
@@ -774,6 +705,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   achieveMuted: { color: colors.textMuted },
+  progressTrack: {
+    width: '100%',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.accentGreen,
+    borderRadius: 2,
+  },
+  progressLabel: {
+    fontFamily: 'Figtree_500Medium',
+    fontSize: 10,
+    color: colors.textMuted,
+  },
+  progressDone: {
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 10,
+    color: colors.accentGreen,
+  },
   historyEmpty: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,

@@ -3,18 +3,17 @@ import type { SessionFormat } from '@padel-nerdz/domain';
 import { AnalyticsEvents, track } from './analytics';
 import { sendGroupMessage } from './chat';
 import {
-  claimDemoPayment,
   closeDemoSession,
   createDemoSession,
   getDemoSession,
   listDemoRegistrations,
   listDemoRegistrationsAll,
   listDemoSessions,
+  markDemoCheckIn,
   markDemoNoShow,
   offerDemoSpot,
   postDemoNeedPlayer,
   registerDemoSession,
-  rejectDemoPaymentClaim,
   seedDemoRegistrants,
   selectDemoPlayers,
   verifyDemoPayment,
@@ -78,6 +77,7 @@ export type Registrant = {
   status: RegistrantStatus;
   reliability: number;
   payment_claimed_at?: string | null;
+  checked_in_at?: string | null;
 };
 
 export type MyRegistrationState =
@@ -101,6 +101,7 @@ function fromDemoReg(r: DemoRegistration): Registrant {
     status: r.status,
     reliability: r.reliability,
     payment_claimed_at: r.payment_claimed_at ?? null,
+    checked_in_at: r.checked_in_at ?? null,
   };
 }
 
@@ -116,10 +117,10 @@ export async function listGroupSessions(
     return listDemoSessions(groupId).map(fromDemo);
   }
 
-  const { data, error } = await getSupabase()
+  const { data, error } = await getSupabaseLoose()
     .from('sessions')
     .select(
-      'id, group_id, title, starts_at, venue_label, format, courts, max_players, price_cents, commission_cents, session_rooms(id)',
+      'id, group_id, title, starts_at, venue_label, format, courts, max_players, price_cents, commission_cents, banner_url, session_rooms(id)',
     )
     .eq('group_id', groupId)
     .order('starts_at', { ascending: true });
@@ -129,14 +130,22 @@ export async function listGroupSessions(
   const out: SessionSummary[] = [];
   for (const row of data ?? []) {
     const room = row.session_rooms as unknown as { id: string } | { id: string }[] | null;
-    const roomId = Array.isArray(room) ? room[0]?.id ?? null : room?.id ?? null;
-    const { count } = await getSupabase()
+    let roomId = Array.isArray(room) ? room[0]?.id ?? null : room?.id ?? null;
+    if (!roomId) {
+      const { data: roomRow } = await getSupabaseLoose()
+        .from('session_rooms')
+        .select('id')
+        .eq('session_id', row.id)
+        .maybeSingle();
+      roomId = (roomRow?.id as string | undefined) ?? null;
+    }
+    const { count } = await getSupabaseLoose()
       .from('session_registrations')
       .select('*', { count: 'exact', head: true })
       .eq('session_id', row.id)
       .neq('status', 'cancelled');
 
-    const { data: regs } = await getSupabase()
+    const { data: regs } = await getSupabaseLoose()
       .from('session_registrations')
       .select('status')
       .eq('session_id', row.id)
@@ -144,16 +153,18 @@ export async function listGroupSessions(
     const lineup = (regs?.length ?? 0) > 0;
 
     out.push({
-      id: row.id,
-      group_id: row.group_id,
-      title: row.title,
-      starts_at: row.starts_at,
-      venue_label: row.venue_label,
+      id: row.id as string,
+      group_id: row.group_id as string,
+      title: row.title as string,
+      starts_at: row.starts_at as string,
+      venue_label: (row.venue_label as string | null) ?? null,
       format: row.format as SessionFormat,
-      courts: row.courts,
-      max_players: row.max_players,
-      price_cents: row.price_cents,
-      commission_cents: (row as { commission_cents?: number | null }).commission_cents ?? PLATFORM_FEE_CENTS,
+      courts: row.courts as number,
+      max_players: row.max_players as number,
+      price_cents: (row.price_cents as number | null) ?? null,
+      commission_cents:
+        (row as { commission_cents?: number | null }).commission_cents ?? PLATFORM_FEE_CENTS,
+      banner_url: (row as { banner_url?: string | null }).banner_url ?? null,
       registered_count: count ?? 0,
       session_room_id: roomId,
       status: roomId ? 'live' : lineup ? 'selected' : 'open',
@@ -175,10 +186,10 @@ export async function getSession(
     return s ? fromDemo(s) : null;
   }
 
-  const { data, error } = await getSupabase()
+  const { data, error } = await getSupabaseLoose()
     .from('sessions')
     .select(
-      'id, group_id, title, starts_at, venue_label, format, courts, max_players, price_cents, commission_cents, session_rooms(id)',
+      'id, group_id, title, starts_at, venue_label, format, courts, max_players, price_cents, commission_cents, banner_url, session_rooms(id)',
     )
     .eq('id', sid)
     .maybeSingle();
@@ -191,29 +202,39 @@ export async function getSession(
   }
 
   const room = data.session_rooms as unknown as { id: string } | { id: string }[] | null;
-  const roomId = Array.isArray(room) ? room[0]?.id ?? null : room?.id ?? null;
-  const { count } = await getSupabase()
+  let roomId = Array.isArray(room) ? room[0]?.id ?? null : room?.id ?? null;
+  // Embed can miss when RLS was tight — fetch room directly for paid/organiser access.
+  if (!roomId) {
+    const { data: roomRow } = await getSupabaseLoose()
+      .from('session_rooms')
+      .select('id')
+      .eq('session_id', data.id)
+      .maybeSingle();
+    roomId = (roomRow?.id as string | undefined) ?? null;
+  }
+  const { count } = await getSupabaseLoose()
     .from('session_registrations')
     .select('*', { count: 'exact', head: true })
     .eq('session_id', data.id)
     .neq('status', 'cancelled');
-  const { data: lineupRegs } = await getSupabase()
+  const { data: lineupRegs } = await getSupabaseLoose()
     .from('session_registrations')
     .select('status')
     .eq('session_id', data.id)
     .in('status', ['selected', 'payment_claimed', 'paid']);
   const lineup = (lineupRegs?.length ?? 0) > 0;
   return {
-    id: data.id,
-    group_id: data.group_id,
-    title: data.title,
-    starts_at: data.starts_at,
-    venue_label: data.venue_label,
+    id: data.id as string,
+    group_id: data.group_id as string,
+    title: data.title as string,
+    starts_at: data.starts_at as string,
+    venue_label: (data.venue_label as string | null) ?? null,
     format: data.format as SessionFormat,
-    courts: data.courts,
-    max_players: data.max_players,
-    price_cents: data.price_cents,
-    commission_cents: data.commission_cents ?? PLATFORM_FEE_CENTS,
+    courts: data.courts as number,
+    max_players: data.max_players as number,
+    price_cents: (data.price_cents as number | null) ?? null,
+    commission_cents: (data.commission_cents as number | null) ?? PLATFORM_FEE_CENTS,
+    banner_url: (data.banner_url as string | null | undefined) ?? null,
     registered_count: count ?? 0,
     session_room_id: roomId,
     status: roomId ? 'live' : lineup ? 'selected' : 'open',
@@ -279,6 +300,7 @@ export async function createMixIn(input: {
       max_players: input.maxPlayers,
       price_cents: input.priceCents ?? null,
       commission_cents: input.commissionCents ?? 100,
+      currency: 'EUR',
       banner_url: input.bannerUrl ?? null,
       created_by: input.userId,
     })
@@ -496,28 +518,40 @@ export async function listRegistrants(
     return source.map(fromDemoReg);
   }
 
-  // Loose client + no embed — typed joins were wiping the interested list in Admin/chat
-  // so organisers looked unregistered even after a successful “I want to play”.
-  let query = getSupabaseLoose()
-    .from('session_registrations')
-    .select('id, user_id, status, payment_claimed_at')
-    .eq('session_id', sessionId);
-  if (!opts?.includeCancelled) {
-    query = query.neq('status', 'cancelled');
+  // Loose client + no embeds — joins were wiping the Admin interest list.
+  // Prefer checked_in_at; fall back if migration not applied yet.
+  let data: unknown[] | null = null;
+  {
+    const withCheckIn = await getSupabaseLoose()
+      .from('session_registrations')
+      .select('id, user_id, status, payment_claimed_at, checked_in_at')
+      .eq('session_id', sessionId);
+    if (!withCheckIn.error) {
+      data = withCheckIn.data;
+    } else {
+      const fallback = await getSupabaseLoose()
+        .from('session_registrations')
+        .select('id, user_id, status, payment_claimed_at')
+        .eq('session_id', sessionId);
+      if (fallback.error) {
+        throw new Error(fallback.error.message || 'Could not load players');
+      }
+      data = fallback.data;
+    }
   }
-  const { data, error } = await query;
-  if (error) throw error;
 
-  const rows = (data ?? []) as Array<{
+  const rows = ((data ?? []) as Array<{
     id: string;
     user_id: string;
     status: string;
     payment_claimed_at: string | null;
-  }>;
+    checked_in_at?: string | null;
+  }>).filter((r) => (opts?.includeCancelled ? true : r.status !== 'cancelled'));
   if (rows.length === 0) return [];
 
   const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
   const nameById = new Map<string, string>();
+  const relById = new Map<string, number>();
   try {
     const { data: profiles } = await getSupabaseLoose()
       .from('profiles')
@@ -528,37 +562,39 @@ export async function listRegistrants(
       if (name) nameById.set(p.id as string, name);
     }
   } catch {
-    // Names are optional — still return registrations.
+    // Names optional
+  }
+  try {
+    const { data: rels, error: relError } = await getSupabaseLoose()
+      .from('player_reliability')
+      .select('user_id, sessions_played, no_shows')
+      .in('user_id', userIds);
+    if (!relError) {
+      for (const rel of rels ?? []) {
+        const attended = (rel.sessions_played as number | undefined) ?? 0;
+        const noShows = (rel.no_shows as number | undefined) ?? 0;
+        const total = attended + noShows;
+        relById.set(
+          rel.user_id as string,
+          total === 0 ? 0 : Math.round((attended / total) * 100),
+        );
+      }
+    }
+  } catch {
+    // Reliability optional
   }
 
-  const out: Registrant[] = [];
-  for (const row of rows) {
-    let reliability = 0;
-    try {
-      const { data: rel } = await getSupabaseLoose()
-        .from('player_reliability')
-        .select('attended, no_shows')
-        .eq('group_id', groupId)
-        .eq('user_id', row.user_id)
-        .maybeSingle();
-      const attended = (rel?.attended as number | undefined) ?? 0;
-      const noShows = (rel?.no_shows as number | undefined) ?? 0;
-      const total = attended + noShows;
-      reliability = total === 0 ? 0 : Math.round((attended / total) * 100);
-    } catch {
-      reliability = 0;
-    }
-
-    out.push({
+  return rows
+    .map((row) => ({
       id: row.id,
       user_id: row.user_id,
       display_name: nameById.get(row.user_id) || 'Player',
       status: row.status as Registrant['status'],
-      reliability,
+      reliability: relById.get(row.user_id) ?? 0,
       payment_claimed_at: row.payment_claimed_at ?? null,
-    });
-  }
-  return out.sort((a, b) => b.reliability - a.reliability);
+      checked_in_at: row.checked_in_at ?? null,
+    }))
+    .sort((a, b) => b.reliability - a.reliability);
 }
 
 export function registrationStateForUser(
@@ -760,10 +796,11 @@ export async function selectPlayersForSession(input: {
   const regs = await listRegistrants(input.sessionId, input.groupId, false);
   for (const reg of regs) {
     const status = input.selectedUserIds.includes(reg.user_id) ? 'selected' : 'waitlist';
-    await getSupabase()
+    const { error } = await getSupabaseLoose()
       .from('session_registrations')
       .update({ status })
       .eq('id', reg.id);
+    if (error) throw error;
   }
 
   const selectedNames = regs
@@ -792,87 +829,34 @@ export async function selectPlayersForSession(input: {
   return { selectedNames };
 }
 
-/** Player honour-claim: does not unlock session chat until organiser verifies. */
-export async function claimSessionPayment(input: {
+/**
+ * @deprecated Honour-claim removed — places unlock only via Stripe PaymentSheet + webhook.
+ */
+export async function claimSessionPayment(_input: {
   sessionId: string;
   groupId: string;
   userId: string;
   displayName: string;
   isGuest: boolean;
-}): Promise<void> {
-  if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
-    claimDemoPayment({
-      sessionId: input.sessionId,
-      groupId: input.groupId,
-      userId: input.userId,
-      displayName: input.displayName,
-    });
-    return;
-  }
-
-  const claimedAt = new Date().toISOString();
-  const { data, error: payError } = await getSupabase()
-    .from('session_registrations')
-    .update({
-      status: 'payment_claimed',
-      payment_claimed_at: claimedAt,
-    })
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('status', 'selected')
-    .select('id');
-  if (payError) throw payError;
-  if (!data?.length) {
-    throw new Error('You need to be selected by the organiser first');
-  }
-
-  const session = await getSession(input.sessionId, false);
-  await sendGroupMessage({
-    groupId: input.groupId,
-    userId: input.userId,
-    displayName: 'Padel Nerdz',
-    isGuest: false,
-    kind: 'system',
-    body: `${input.displayName} says they paid for ${session?.title ?? 'the mix-in'} — check Bizum/Revolut, then confirm in Verify payments.`,
-    payload: {
-      event: 'payment_claimed',
-      session_id: input.sessionId,
-      user_id: input.userId,
-    },
-  });
+}): Promise<{ sessionRoomId: string | null }> {
+  throw new Error('Pay in-app with Stripe — honour claims are disabled.');
 }
 
-/** Organiser rejects a false claim — player goes back to “pay to confirm”. */
-export async function rejectPaymentClaim(input: {
+/** @deprecated Honour reject removed — Stripe is the only pay path. */
+export async function rejectPaymentClaim(_input: {
   sessionId: string;
   groupId: string;
   playerUserId: string;
   organiserId: string;
   isGuest: boolean;
 }): Promise<void> {
-  if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
-    rejectDemoPaymentClaim({
-      sessionId: input.sessionId,
-      userId: input.playerUserId,
-    });
-    return;
-  }
-
-  const { data, error } = await getSupabase()
-    .from('session_registrations')
-    .update({
-      status: 'selected',
-      payment_claimed_at: null,
-    })
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.playerUserId)
-    .eq('status', 'payment_claimed')
-    .select('id');
-  if (error) throw error;
-  if (!data?.length) throw new Error('No payment claim to reject');
+  throw new Error('Manual payment verify is disabled. Players pay with Stripe.');
 }
 
-/** Organiser confirms money received → paid + session room access. */
+/**
+ * @deprecated Organiser bank-verify removed — paid status is set by Stripe webhook only.
+ * Demo mode still unlocks for offline testing.
+ */
 export async function verifySessionPayment(input: {
   sessionId: string;
   groupId: string;
@@ -890,70 +874,53 @@ export async function verifySessionPayment(input: {
       organiserId: input.organiserId,
     });
   }
+  throw new Error(
+    'Manual verify is disabled. Players pay in-app with Stripe — the place unlocks automatically.',
+  );
+}
 
-  const verifiedAt = new Date().toISOString();
-  const { data, error: payError } = await getSupabase()
-    .from('session_registrations')
-    .update({
-      status: 'paid',
-      payment_verified_at: verifiedAt,
-      payment_verified_by: input.organiserId,
-    })
+/**
+ * Paid players (and organisers) get session-room membership so chat unlocks.
+ * Safe to call repeatedly — upserts membership when a room already exists.
+ */
+export async function ensurePaidSessionRoomAccess(input: {
+  sessionId: string;
+  userId: string;
+  isGuest: boolean;
+}): Promise<string | null> {
+  if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
+    const s = getDemoSession(input.sessionId);
+    return s?.session_room_id ?? null;
+  }
+
+  const { data: room } = await getSupabaseLoose()
+    .from('session_rooms')
+    .select('id')
     .eq('session_id', input.sessionId)
-    .eq('user_id', input.playerUserId)
-    .eq('status', 'payment_claimed')
-    .select('id');
-  if (payError) throw payError;
-  if (!data?.length) {
-    throw new Error('Player hasn’t claimed payment yet');
+    .maybeSingle();
+  if (!room?.id) return null;
+
+  const roomId = room.id as string;
+
+  const { data: reg } = await getSupabaseLoose()
+    .from('session_registrations')
+    .select('status')
+    .eq('session_id', input.sessionId)
+    .eq('user_id', input.userId)
+    .maybeSingle();
+
+  const status = reg?.status as RegistrantStatus | undefined;
+  if (status === 'paid') {
+    const { error } = await getSupabaseLoose().from('session_room_members').upsert(
+      { session_room_id: roomId, user_id: input.userId },
+      { onConflict: 'session_room_id,user_id', ignoreDuplicates: true },
+    );
+    if (error && !/duplicate|unique/i.test(error.message)) {
+      console.warn('ensurePaidSessionRoomAccess membership', error.message);
+    }
   }
 
-  const session = await getSession(input.sessionId, false);
-  let roomId = session?.session_room_id ?? null;
-
-  if (!roomId) {
-    const { data: room, error: roomError } = await getSupabase()
-      .from('session_rooms')
-      .insert({ session_id: input.sessionId })
-      .select('id')
-      .single();
-    if (roomError) throw roomError;
-    roomId = room.id;
-
-    await getSupabaseLoose().from('session_room_messages').insert({
-      session_room_id: roomId,
-      sender_id: null,
-      kind: 'system',
-      body: `Welcome to ${session?.title ?? 'the mix-in'}. Share scores, photos, and plans here.`,
-      payload: {},
-    });
-  }
-
-  const { error: memberError } = await getSupabase().from('session_room_members').insert({
-    session_room_id: roomId,
-    user_id: input.playerUserId,
-  });
-  if (memberError && !memberError.message.toLowerCase().includes('duplicate')) {
-    throw memberError;
-  }
-
-  await getSupabaseLoose().from('session_room_messages').insert({
-    session_room_id: roomId,
-    sender_id: null,
-    kind: 'system',
-    body: `${input.playerDisplayName} — payment verified by organiser.`,
-    payload: {},
-  });
-
-  // Unlock / refresh courts once enough players have paid
-  try {
-    const { ensureSessionFixtures } = await import('./fixtures');
-    await ensureSessionFixtures({ sessionId: input.sessionId, isGuest: false });
-  } catch (e) {
-    console.warn('ensureSessionFixtures after pay', e);
-  }
-
-  return { sessionRoomId: roomId };
+  return roomId;
 }
 
 export async function closeSession(input: {
@@ -963,13 +930,35 @@ export async function closeSession(input: {
   isGuest: boolean;
   wrapMediaUrl?: string | null;
 }): Promise<SessionSummary> {
+  const { buildWrapDeck, wrapDeckToPayload } = await import('./wrap');
+
   if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
+    const sessionPreview = await getSession(input.sessionId, true);
+    let wrapPayload: Record<string, unknown> | null = null;
+    try {
+      const deck = await buildWrapDeck({
+        sessionId: input.sessionId,
+        groupId: input.groupId,
+        userId: input.organiserId,
+        isGuest: true,
+        session: sessionPreview,
+      });
+      wrapPayload = wrapDeckToPayload(deck);
+    } catch (e) {
+      console.warn('closeSession wrap deck', e);
+    }
+    const photo = Array.isArray(wrapPayload?.slides)
+      ? (wrapPayload!.slides as Array<{ kind?: string; uri?: string }>).find(
+          (s) => s.kind === 'photo',
+        )
+      : null;
     return fromDemo(
       closeDemoSession({
         sessionId: input.sessionId,
         groupId: input.groupId,
         organiserId: input.organiserId,
-        wrapMediaUrl: input.wrapMediaUrl,
+        wrapMediaUrl: input.wrapMediaUrl ?? photo?.uri ?? null,
+        wrapPayload,
       }),
     );
   }
@@ -977,9 +966,28 @@ export async function closeSession(input: {
   const session = await getSession(input.sessionId, false);
   if (!session) throw new Error('Session not found');
 
-  const wrapUri =
-    input.wrapMediaUrl ??
-    'https://images.unsplash.com/photo-1554068865-24cecd4e343f?w=800&q=80';
+  let deckPayload: Record<string, unknown> = {
+    session_id: input.sessionId,
+    title: session.title,
+    player_count: 0,
+  };
+  try {
+    const deck = await buildWrapDeck({
+      sessionId: input.sessionId,
+      groupId: input.groupId,
+      userId: input.organiserId,
+      isGuest: false,
+      session,
+    });
+    deckPayload = wrapDeckToPayload(deck);
+  } catch (e) {
+    console.warn('closeSession wrap deck', e);
+  }
+
+  const photoSlide = Array.isArray(deckPayload.slides)
+    ? (deckPayload.slides as Array<{ kind?: string; uri?: string }>).find((s) => s.kind === 'photo')
+    : null;
+  const wrapUri = input.wrapMediaUrl ?? photoSlide?.uri ?? null;
 
   await getSupabaseLoose()
     .from('sessions')
@@ -990,8 +998,18 @@ export async function closeSession(input: {
     })
     .eq('id', input.sessionId);
 
-  const regs = await listRegistrants(input.sessionId, input.groupId, false);
-  const count = regs.filter((r) => r.status === 'paid' || r.status === 'selected').length;
+  try {
+    const { awardSessionClosedPlayed } = await import('./points');
+    await awardSessionClosedPlayed({ sessionId: input.sessionId, isGuest: false });
+  } catch (e) {
+    console.warn('closeSession point awards', e);
+  }
+
+  const wrapPayload = {
+    ...deckPayload,
+    media_url: wrapUri,
+    closed_at: new Date().toISOString(),
+  };
 
   await sendGroupMessage({
     groupId: input.groupId,
@@ -1000,13 +1018,33 @@ export async function closeSession(input: {
     isGuest: false,
     kind: 'wrap_card',
     body: `Wrap-up: ${session.title}`,
-    payload: {
-      session_id: input.sessionId,
-      title: session.title,
-      media_url: wrapUri,
-      player_count: count,
-    },
+    payload: wrapPayload,
   });
+
+  if (session.session_room_id) {
+    try {
+      const { sendSessionRoomMessage } = await import('./chat');
+      await sendSessionRoomMessage({
+        roomId: session.session_room_id,
+        userId: input.organiserId,
+        displayName: 'Padel Nerdz',
+        isGuest: false,
+        kind: 'wrap_card',
+        body: `Wrap-up: ${session.title}`,
+        payload: wrapPayload,
+      });
+      await sendSessionRoomMessage({
+        roomId: session.session_room_id,
+        userId: input.organiserId,
+        displayName: 'Padel Nerdz',
+        isGuest: false,
+        kind: 'system',
+        body: 'Session closed — this chat is now read-only.',
+      });
+    } catch (e) {
+      console.warn('closeSession session-room wrap', e);
+    }
+  }
 
   return { ...session, status: 'closed', wrap_media_url: wrapUri };
 }
@@ -1056,29 +1094,70 @@ export async function markSessionNoShow(input: {
     .eq('user_id', input.userId);
   if (error) throw error;
 
-  const { data: existing } = await getSupabaseLoose()
-    .from('group_member_profiles')
-    .select('sessions_played, no_shows')
-    .eq('group_id', input.groupId)
-    .eq('user_id', input.userId)
-    .maybeSingle();
-
-  const noShows = ((existing?.no_shows as number | undefined) ?? 0) + 1;
-  const played = (existing?.sessions_played as number | undefined) ?? 0;
-
-  await getSupabaseLoose().from('group_member_profiles').upsert(
-    {
-      group_id: input.groupId,
-      user_id: input.userId,
-      no_shows: noShows,
-      sessions_played: played,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'group_id,user_id' },
-  );
+  try {
+    const { awardPointEvent } = await import('./points');
+    await awardPointEvent({
+      groupId: input.groupId,
+      userId: input.userId,
+      kind: 'no_show',
+      sessionId: input.sessionId,
+      isGuest: false,
+    });
+  } catch (e) {
+    console.warn('award no_show', e);
+  }
 
   const regs = await listRegistrants(input.sessionId, input.groupId, false);
   return regs.find((r) => r.user_id === input.userId) ?? null;
+}
+
+export async function markSessionCheckIn(input: {
+  sessionId: string;
+  groupId: string;
+  userId: string;
+  isGuest: boolean;
+}): Promise<Registrant | null> {
+  if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
+    const reg = markDemoCheckIn({
+      sessionId: input.sessionId,
+      userId: input.userId,
+    });
+    return reg ? fromDemoReg(reg) : null;
+  }
+
+  const { error } = await getSupabaseLoose()
+    .from('session_registrations')
+    .update({ checked_in_at: new Date().toISOString() })
+    .eq('session_id', input.sessionId)
+    .eq('user_id', input.userId)
+    .eq('status', 'paid');
+  if (error) {
+    const missingCol =
+      error.code === '42703' || /checked_in_at/i.test(error.message ?? '');
+    if (missingCol) {
+      throw new Error(
+        'Check-in isn’t set up on this project yet — apply the check-in migration.',
+      );
+    }
+    throw new Error(error.message || 'Check-in failed');
+  }
+
+  const regs = await listRegistrants(input.sessionId, input.groupId, false);
+  return regs.find((r) => r.user_id === input.userId) ?? null;
+}
+
+/** Resolve a bare check-in code against paid players for a session. */
+export async function findRegistrantByCheckInCode(input: {
+  sessionId: string;
+  groupId: string;
+  code: string;
+  isGuest: boolean;
+}): Promise<Registrant | null> {
+  const { checkInCode } = await import('./check-in');
+  const regs = await listRegistrants(input.sessionId, input.groupId, input.isGuest);
+  const paid = regs.filter((r) => r.status === 'paid');
+  const needle = input.code.trim().toUpperCase();
+  return paid.find((r) => checkInCode(input.sessionId, r.user_id) === needle) ?? null;
 }
 
 export type MixinHistoryItem = {

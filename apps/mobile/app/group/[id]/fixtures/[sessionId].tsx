@@ -1,5 +1,14 @@
 import { colors, spacing } from '@padel-nerdz/config';
-import { allMatchesScored } from '@padel-nerdz/domain';
+import {
+  allGroupStandings,
+  allMatchesScored,
+  describeTournamentTeam,
+  isTournamentByWinsRound,
+  isValidBestOfNine,
+  tournamentAdvanceLabel,
+  tournamentPhaseSubtitle,
+  type TournamentByWinsRound,
+} from '@padel-nerdz/domain';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -25,7 +34,7 @@ import {
   listCourtScoreMeta,
   setMatchScore,
   type CourtScoreMeta,
-  type FixtureRound,
+  type SessionFixtureState,
 } from '@/lib/fixtures';
 import { canOrganiseGroup, getGroup } from '@/lib/groups';
 import { useGlassHeaderOffset } from '@/lib/layout';
@@ -39,7 +48,7 @@ export default function FixturesScreen() {
   const isGuest = offline;
   const userId = user?.id ?? profile?.id ?? '';
 
-  const [round, setRound] = useState<FixtureRound | null>(null);
+  const [round, setRound] = useState<SessionFixtureState | null>(null);
   const [title, setTitle] = useState('Fixtures');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +112,11 @@ export default function FixturesScreen() {
     if (scoreA === scoreB) {
       void warn();
       setError('Scores can’t be tied — padel games need a winner');
+      return;
+    }
+    if (round && isTournamentByWinsRound(round) && !isValidBestOfNine(scoreA, scoreB)) {
+      void warn();
+      setError('Best of 9 — winner must have 5 games (e.g. 5–3 or 5–4)');
       return;
     }
     void tap();
@@ -177,11 +191,24 @@ export default function FixturesScreen() {
 
   const sorted = [...(round?.matches ?? [])].sort((a, b) => a.court - b.court);
   const ready = round ? allMatchesScored(round) : false;
-  const totalCourts = sorted.length;
+  const isTournament = round ? isTournamentByWinsRound(round) : false;
+  const tournament = isTournament ? (round as TournamentByWinsRound) : null;
+  const standings = tournament ? allGroupStandings(tournament) : null;
+  const advanceLabel = tournament
+    ? tournament.phase === 'complete'
+      ? 'Tournament complete'
+      : ready
+        ? tournamentAdvanceLabel(tournament)
+        : 'Score every match to advance'
+    : ready
+      ? 'Generate next round'
+      : 'Score every court to unlock next round';
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Courts', headerBackTitle: 'Back' }} />
+      <Stack.Screen
+        options={{ title: isTournament ? 'Tournament' : 'Courts', headerBackTitle: 'Back' }}
+      />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accentGreen} />
@@ -198,15 +225,51 @@ export default function FixturesScreen() {
         >
           <Text style={styles.heading}>{title}</Text>
           <Text style={styles.sub}>
-            Round {round?.round ?? 1} · Kings at the top · Queens at the bottom · winners up,
-            losers down · partners split
+            {tournament
+              ? tournamentPhaseSubtitle(tournament)
+              : `Round ${round?.round ?? 1} · Kings & Queens on top · win and stay · winners up, losers down · partners split`}
           </Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
+          {tournament && standings && tournament.phase !== 'complete' ? (
+            <View style={styles.standingsBlock}>
+              <Text style={styles.benchTitle}>Group tables · points = games won</Text>
+              {tournament.groups.map((g) => (
+                <View key={g.id} style={styles.tableCard}>
+                  <Text style={styles.tableTitle}>
+                    {g.label}
+                    <Text style={styles.tableCat}> · Cat {g.category}</Text>
+                  </Text>
+                  {(standings[g.id] ?? []).map((row, idx) => (
+                    <View key={row.team_id} style={styles.tableRow}>
+                      <Text style={styles.tablePos}>{idx + 1}</Text>
+                      <Text style={styles.tableTeam} numberOfLines={1}>
+                        {describeTournamentTeam(tournament, row.team_id)}
+                      </Text>
+                      <Text style={styles.tablePts}>{row.points}</Text>
+                      <Text style={styles.tableMeta}>
+                        {row.match_wins}W · {row.played}P
+                      </Text>
+                    </View>
+                  ))}
+                  <Text style={styles.tableHint}>Top 2 advance</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {tournament?.phase === 'complete' ? (
+            <View style={styles.tableCard}>
+              <Text style={styles.tableTitle}>Champions</Text>
+              <Text style={styles.sub}>
+                Group points decided the knockouts. Finals are winner-take-all.
+              </Text>
+            </View>
+          ) : null}
+
           {sorted.map((match, index) => {
-            const isKings = match.court === 1;
-            const isQueens = match.court === totalCourts && totalCourts > 1;
+            const isKingsQueens = !isTournament && match.court === 1;
             const draft = draftScores[match.court] ?? { a: '', b: '' };
             const decided = match.winner === 'a' || match.winner === 'b';
 
@@ -215,23 +278,31 @@ export default function FixturesScreen() {
                 key={match.court}
                 style={[
                   styles.courtCard,
-                  isKings && styles.kingsCard,
-                  isQueens && styles.queensCard,
+                  isKingsQueens && styles.kingsCard,
+                  isTournament && styles.tournamentCard,
                 ]}
               >
                 <View style={styles.courtHead}>
                   <View>
                     <Text style={styles.courtRank}>
-                      {isKings ? '▲ KINGS' : isQueens ? '▼ QUEENS' : `#${match.court}`}
+                      {isTournament
+                        ? match.label.toUpperCase()
+                        : isKingsQueens
+                          ? '▲ KINGS & QUEENS'
+                          : `#${match.court}`}
                     </Text>
-                    <Text style={styles.courtLabel}>{match.label}</Text>
+                    <Text style={styles.courtLabel}>
+                      {isTournament ? `Match ${match.court}` : match.label}
+                    </Text>
                   </View>
                   {decided ? (
                     <Text style={styles.scoreFinal}>
                       {match.score_a} – {match.score_b}
                     </Text>
                   ) : (
-                    <Text style={styles.waiting}>Enter score</Text>
+                    <Text style={styles.waiting}>
+                      {isTournament ? 'Best of 9' : 'Enter score'}
+                    </Text>
                   )}
                 </View>
 
@@ -329,9 +400,14 @@ export default function FixturesScreen() {
                   );
                 })()}
 
-                {index < sorted.length - 1 ? (
+                {!isTournament && index < sorted.length - 1 ? (
                   <Text style={styles.moveHint}>
                     Winners ↑ · Losers ↓ · partners split next round
+                  </Text>
+                ) : null}
+                {isTournament && tournament?.phase === 'group' ? (
+                  <Text style={styles.moveHint}>
+                    Both sides bank games won on the table — even a 5–4 loss is worth 4 points
                   </Text>
                 ) : null}
               </View>
@@ -340,7 +416,9 @@ export default function FixturesScreen() {
 
           {round?.unassigned.length ? (
             <View style={styles.bench}>
-              <Text style={styles.benchTitle}>Rest / waiting</Text>
+              <Text style={styles.benchTitle}>
+                {isTournament ? 'Not seeded / bye' : 'Rest / waiting'}
+              </Text>
               {round.unassigned.map((p) => (
                 <View key={p.user_id} style={styles.benchRow}>
                   <Avatar name={p.display_name} size={32} />
@@ -350,15 +428,17 @@ export default function FixturesScreen() {
             </View>
           ) : null}
 
-          <Pressable
-            style={[styles.nextBtn, !ready && styles.nextBtnDisabled]}
-            onPress={() => void nextRound()}
-            disabled={!ready}
-          >
-            <Text style={[styles.nextBtnText, !ready && styles.nextBtnTextDisabled]}>
-              {ready ? 'Generate next round' : 'Score every court to unlock next round'}
-            </Text>
-          </Pressable>
+          {tournament?.phase !== 'complete' ? (
+            <Pressable
+              style={[styles.nextBtn, !ready && styles.nextBtnDisabled]}
+              onPress={() => void nextRound()}
+              disabled={!ready}
+            >
+              <Text style={[styles.nextBtnText, !ready && styles.nextBtnTextDisabled]}>
+                {advanceLabel}
+              </Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       )}
     </>
@@ -435,6 +515,65 @@ const styles = StyleSheet.create({
   queensCard: {
     borderColor: colors.border,
     backgroundColor: '#141414',
+  },
+  tournamentCard: {
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  standingsBlock: { gap: 10 },
+  tableCard: {
+    backgroundColor: colors.elevated,
+    borderRadius: 14,
+    padding: spacing.md,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tableTitle: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  tableCat: {
+    fontFamily: 'Figtree_400Regular',
+    color: colors.textMuted,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tablePos: {
+    width: 18,
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 13,
+    color: colors.accentGreen,
+  },
+  tableTeam: {
+    flex: 1,
+    fontFamily: 'Figtree_600SemiBold',
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  tablePts: {
+    fontFamily: 'Figtree_700Bold',
+    fontSize: 15,
+    color: colors.accentGreen,
+    minWidth: 28,
+    textAlign: 'right',
+  },
+  tableMeta: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 11,
+    color: colors.textMuted,
+    minWidth: 56,
+    textAlign: 'right',
+  },
+  tableHint: {
+    fontFamily: 'Figtree_400Regular',
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   courtHead: {
     flexDirection: 'row',

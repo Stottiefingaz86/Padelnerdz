@@ -14,6 +14,7 @@ import {
   listDemoDiscoverable,
   listDemoMembers,
   listDemoMemberships,
+  deleteDemoGroup,
   removeDemoMember,
   updateDemoGroup,
   updateDemoMemberProfile,
@@ -53,6 +54,7 @@ export type GroupSummary = {
   skill_level_max: OrganiserLevel | null;
   distance_miles: number | null;
   cover_url: string | null;
+  avatar_url: string | null;
   members_can_post: boolean;
   created_by: string;
   created_at: string;
@@ -63,7 +65,7 @@ export type GroupSummary = {
 };
 
 const GROUP_FIELDS =
-  'id, name, description, visibility, location_label, skill_level, skill_level_max, cover_url, members_can_post, created_by, created_at, invite_code';
+  'id, name, description, visibility, location_label, skill_level, skill_level_max, cover_url, avatar_url, members_can_post, created_by, created_at, invite_code';
 
 const LEVEL_RANK: Record<OrganiserLevel, number> = {
   unknown: 0,
@@ -94,9 +96,11 @@ export function formatGroupLevelBand(
   min: OrganiserLevel | null | undefined,
   max?: OrganiserLevel | null | undefined,
 ) {
-  if (!min || min === 'unknown') return null;
+  if (!min || min === 'unknown') return 'All levels';
   const top = max && max !== 'unknown' ? max : min;
   if (min === top) return levelLabel(min);
+  // Full band beginner→pro is the same as welcoming everyone
+  if (min === 'beginner' && top === 'pro') return 'All levels';
   return `${levelLabel(min)} – ${levelLabel(top)}`;
 }
 
@@ -136,6 +140,7 @@ function fromDemo(
     skill_level_max: g.skill_level_max ?? g.skill_level,
     distance_miles,
     cover_url: g.cover_url,
+    avatar_url: g.avatar_url ?? null,
     members_can_post: g.members_can_post,
     created_by: g.created_by,
     created_at: g.created_at,
@@ -156,6 +161,7 @@ function mapGroup(
     skill_level?: string | null;
     skill_level_max?: string | null;
     cover_url?: string | null;
+    avatar_url?: string | null;
     members_can_post?: boolean | null;
     created_by: string;
     created_at: string;
@@ -176,6 +182,7 @@ function mapGroup(
     skill_level_max: max,
     distance_miles: extras.distance_miles ?? null,
     cover_url: group.cover_url ?? null,
+    avatar_url: group.avatar_url ?? null,
     members_can_post: group.members_can_post ?? true,
     created_by: group.created_by,
     created_at: group.created_at,
@@ -263,11 +270,20 @@ export async function listGroupMembers(
     | undefined;
   const viewerIsOrganiser = isOrganiser(myRole);
 
+  let pointsByUser = new Map<string, number>();
+  try {
+    const { fetchGroupAllTimePoints } = await import('./points');
+    pointsByUser = await fetchGroupAllTimePoints(groupId, userId, false);
+  } catch {
+    pointsByUser = new Map();
+  }
+
   const out: GroupMember[] = (data ?? []).map((row) => {
     const profile = row.profiles as unknown as { display_name: string | null } | null;
     const extra = byUser.get(row.user_id);
     const played = (extra?.sessions_played as number | undefined) ?? 0;
     const noShows = (extra?.no_shows as number | undefined) ?? 0;
+    const ledgerPts = pointsByUser.get(row.user_id);
     return {
       user_id: row.user_id,
       display_name: profile?.display_name?.trim() || 'Player',
@@ -278,7 +294,7 @@ export async function listGroupMembers(
       no_shows: noShows,
       reliability: reliabilityFrom(played, noShows),
       best_finish: null,
-      points: played * 10,
+      points: ledgerPts ?? 0,
       is_you: row.user_id === userId,
       group_rank: 0,
     };
@@ -558,12 +574,7 @@ export async function createGroup(
     inviteFriendIds?: string[];
   },
 ): Promise<GroupSummary> {
-  if (
-    (input.visibility === 'public' || input.visibility === 'approval') &&
-    (!input.skill_level || input.skill_level === 'unknown')
-  ) {
-    throw new Error('Pick a group level before going public');
-  }
+  // skill_level null = All levels (allowed for public / approval)
 
   if (isGuest || !isSupabaseConfigured) {
     return fromDemo(
@@ -623,7 +634,23 @@ export async function createGroup(
 
   if (!data) throw new Error('Group created but no data returned — check Chats.');
 
-  return mapGroup(data, { role: 'owner', member_count: 1, is_member: true });
+  const summary = mapGroup(data, { role: 'owner', member_count: 1, is_member: true });
+
+  const inviteIds = (input.inviteFriendIds ?? []).filter((id) => id && id !== userId);
+  if (inviteIds.length > 0) {
+    try {
+      await inviteFriendsToGroup({
+        groupId: summary.id,
+        friendIds: inviteIds,
+        isGuest: false,
+      });
+      summary.member_count = 1 + inviteIds.length;
+    } catch {
+      // Group exists; invites can be retried from Admin.
+    }
+  }
+
+  return summary;
 }
 
 export async function inviteFriendsToGroup(input: {
@@ -671,15 +698,11 @@ export async function updateGroup(
     skill_level?: OrganiserLevel | null;
     skill_level_max?: OrganiserLevel | null;
     cover_url?: string | null;
+    avatar_url?: string | null;
     members_can_post?: boolean;
   },
 ): Promise<GroupSummary> {
-  if (
-    (patch.visibility === 'public' || patch.visibility === 'approval') &&
-    (!patch.skill_level || patch.skill_level === 'unknown')
-  ) {
-    throw new Error('Pick a group level before going public');
-  }
+  // skill_level null = All levels (allowed for public / approval)
 
   if (isGuest || !isSupabaseConfigured || groupId.startsWith('demo-')) {
     const updated = updateDemoGroup(groupId, patch);
@@ -694,18 +717,22 @@ export async function updateGroup(
       ? patch.skill_level_max
       : min;
 
+  const payload: Record<string, unknown> = {};
+  if (patch.name !== undefined) payload.name = patch.name.trim();
+  if (patch.description !== undefined) payload.description = patch.description.trim() || null;
+  if (patch.visibility !== undefined) payload.visibility = patch.visibility;
+  if (patch.location_label !== undefined) {
+    payload.location_label = patch.location_label.trim() || null;
+  }
+  if (patch.skill_level !== undefined) payload.skill_level = min;
+  if (patch.skill_level_max !== undefined) payload.skill_level_max = max;
+  if (patch.cover_url !== undefined) payload.cover_url = patch.cover_url;
+  if (patch.avatar_url !== undefined) payload.avatar_url = patch.avatar_url;
+  if (patch.members_can_post !== undefined) payload.members_can_post = patch.members_can_post;
+
   const { data, error } = await getSupabaseLoose()
     .from('groups')
-    .update({
-      name: patch.name?.trim(),
-      description: patch.description?.trim() || null,
-      visibility: patch.visibility,
-      location_label: patch.location_label?.trim() || null,
-      skill_level: min,
-      skill_level_max: max,
-      cover_url: patch.cover_url,
-      members_can_post: patch.members_can_post,
-    })
+    .update(payload)
     .eq('id', groupId)
     .select(GROUP_FIELDS)
     .single();
@@ -713,6 +740,26 @@ export async function updateGroup(
   if (error) throw error;
   const refreshed = await getGroup(groupId, userId, false);
   return refreshed ?? mapGroup(data, { role: 'organiser', member_count: 1, is_member: true });
+}
+
+/** Permanently delete a group (organiser only). Cascades memberships/sessions via DB. */
+export async function deleteGroup(
+  groupId: string,
+  userId: string,
+  isGuest: boolean,
+): Promise<void> {
+  const group = await getGroup(groupId, userId, isGuest);
+  if (!group || !canOrganiseGroup(group, userId)) {
+    throw new Error('Only organisers can delete this group');
+  }
+
+  if (isGuest || !isSupabaseConfigured || groupId.startsWith('demo-')) {
+    if (!deleteDemoGroup(groupId)) throw new Error('Group not found');
+    return;
+  }
+
+  const { error } = await getSupabaseLoose().from('groups').delete().eq('id', groupId);
+  if (error) throw error;
 }
 
 export function levelLabel(level: OrganiserLevel) {
@@ -903,40 +950,35 @@ export async function joinByInviteCode(
     return fromDemo(joined, true, userId);
   }
 
-  const { data: group, error } = await getSupabase()
-    .from('groups')
-    .select(GROUP_FIELDS)
-    .eq('invite_code', code)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!group) throw new Error('Invite code not found');
-
-  const existing = await getGroup(group.id, userId, false);
-  if (existing?.is_member) return existing;
-
-  const { error: joinError } = await getSupabase().from('group_memberships').insert({
-    group_id: group.id,
-    user_id: userId,
-    role: 'member',
+  const { data, error } = await getSupabaseLoose().rpc('join_group_by_invite_code', {
+    p_code: code,
   });
-  if (joinError) throw joinError;
+  if (error) {
+    const msg = error.message || 'Could not join with that code';
+    if (/invite code not found/i.test(msg)) throw new Error('Invite code not found');
+    throw new Error(msg);
+  }
+  const payload = data as { group_id?: string; joined?: boolean } | null;
+  const groupId = payload?.group_id;
+  if (!groupId) throw new Error('Invite code not found');
 
-  await sendGroupMessage({
-    groupId: group.id,
-    userId,
-    displayName: 'Padel Nerdz',
-    isGuest: false,
-    kind: 'system',
-    body: `${name} joined the group`,
-    payload: { event: 'member_joined', user_id: userId },
-  });
+  if (payload?.joined) {
+    await sendGroupMessage({
+      groupId,
+      userId,
+      displayName: 'Padel Nerdz',
+      isGuest: false,
+      kind: 'system',
+      body: `${name} joined the group`,
+      payload: { event: 'member_joined', user_id: userId },
+    });
+    track(AnalyticsEvents.groupJoined, {
+      group_id: groupId,
+      source: 'invite',
+    });
+  }
 
-  const refreshed = await getGroup(group.id, userId, false);
-  if (!refreshed) throw new Error('Joined but failed to reload group');
-  track(AnalyticsEvents.groupJoined, {
-    group_id: group.id,
-    source: 'invite',
-  });
+  const refreshed = await getGroup(groupId, userId, false);
+  if (!refreshed?.is_member) throw new Error('Joined but failed to reload group');
   return refreshed;
 }

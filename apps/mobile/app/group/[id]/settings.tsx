@@ -7,7 +7,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { LevelRangePicker, type LevelRange } from '@/components/LevelRangePicker';
+import { LevelRangePicker, type LevelChoice } from '@/components/LevelRangePicker';
 import { VisibilityPicker } from '@/components/VisibilityPicker';
 import { useAuth } from '@/lib/auth';
 import { select, success, tap } from '@/lib/feedback';
@@ -23,7 +23,7 @@ export default function GroupSettingsScreen() {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [visibility, setVisibility] = useState<GroupVisibility>('private');
-  const [levelRange, setLevelRange] = useState<LevelRange | null>(null);
+  const [levelChoice, setLevelChoice] = useState<LevelChoice>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [membersCanPost, setMembersCanPost] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -40,15 +40,19 @@ export default function GroupSettingsScreen() {
       setLocation(group.location_label ?? '');
       setVisibility(group.visibility);
       if (group.skill_level && group.skill_level !== 'unknown') {
-        setLevelRange({
-          min: group.skill_level,
-          max:
-            group.skill_level_max && group.skill_level_max !== 'unknown'
-              ? group.skill_level_max
-              : group.skill_level,
-        });
+        const max =
+          group.skill_level_max && group.skill_level_max !== 'unknown'
+            ? group.skill_level_max
+            : group.skill_level;
+        if (group.skill_level === 'beginner' && max === 'pro') {
+          setLevelChoice('all');
+        } else {
+          setLevelChoice({ min: group.skill_level, max });
+        }
+      } else if (group.visibility === 'public' || group.visibility === 'approval') {
+        setLevelChoice('all');
       } else {
-        setLevelRange(null);
+        setLevelChoice(null);
       }
       setCoverUrl(group.cover_url);
       setMembersCanPost(group.members_can_post);
@@ -75,19 +79,23 @@ export default function GroupSettingsScreen() {
       setError('Name is required');
       return;
     }
-    if (needsLevel && !levelRange) {
-      setError('Choose who can join before making this group discoverable');
+    if (needsLevel && !levelChoice) {
+      setError('Choose who can join, or tap All levels');
       return;
     }
     setLoading(true);
     try {
+      const skillMin =
+        needsLevel && levelChoice && levelChoice !== 'all' ? levelChoice.min : null;
+      const skillMax =
+        needsLevel && levelChoice && levelChoice !== 'all' ? levelChoice.max : null;
       await updateGroup(id, userId, isGuest, {
         name,
         description,
         location_label: location,
         visibility,
-        skill_level: needsLevel ? levelRange?.min ?? null : null,
-        skill_level_max: needsLevel ? levelRange?.max ?? null : null,
+        skill_level: skillMin,
+        skill_level_max: skillMax,
         cover_url: coverUrl,
         members_can_post: membersCanPost,
       });
@@ -122,21 +130,28 @@ export default function GroupSettingsScreen() {
           multiline
           style={styles.multiline}
         />
-        <TextField label="Area" value={location} onChangeText={setLocation} />
+        <TextField
+          label="Town or city"
+          value={location}
+          onChangeText={setLocation}
+          placeholder="e.g. Marbella, Madrid, Buenos Aires"
+          autoCorrect={false}
+        />
         <VisibilityPicker
           value={visibility}
           onChange={(next) => {
             setVisibility(next);
-            if (next === 'private') setLevelRange(null);
+            if (next === 'private') setLevelChoice(null);
           }}
         />
         {needsLevel ? (
           <LevelRangePicker
-            value={levelRange}
+            value={levelChoice}
             required
-            onChange={setLevelRange}
+            allowAll
+            onChange={setLevelChoice}
             label="Who can join"
-            help="Tap one level, or two ends for a band — e.g. Beginner through Intermediate."
+            help="All levels, one level, or a band — e.g. Beginner through Intermediate."
           />
         ) : null}
 

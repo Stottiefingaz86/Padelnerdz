@@ -30,6 +30,7 @@ Security is a release-blocking workstream.
 - size limits
 - content-type validation
 - short-lived URL access for private media
+- Cloudflare R2/CDN/WAF is optional later for media scale — **not** a launch security dependency (current stack: Supabase Auth + RLS + Edge signatures + signed URLs)
 
 ## 6. Abuse / moderation
 - user blocking

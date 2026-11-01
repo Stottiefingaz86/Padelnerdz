@@ -13,7 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 
 /** Nav bar body below the status bar (matches apps/mobile glass headers). */
-const STACK_HEADER_BODY = Platform.OS === 'ios' ? 44 : 56;
+const STACK_HEADER_BODY = Platform.OS === 'ios' ? 52 : 56;
 
 type Props = {
   children: ReactNode;

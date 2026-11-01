@@ -25,3 +25,4 @@ apps/mobile/ios/
 apps/mobile/android/
 supabase/.branches/
 supabase/.temp/
+.env.stripe.local

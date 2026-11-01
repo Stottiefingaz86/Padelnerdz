@@ -12,7 +12,7 @@ export type FixtureSide = {
 
 export type FixtureMatch = {
   court: number;
-  /** Court 1 = Kings (top). Highest court = Queens (bottom). */
+  /** Court 1 = Kings & Queens (top). Other courts numbered. */
   label: string;
   team_a: FixtureSide;
   team_b: FixtureSide;
@@ -28,10 +28,8 @@ export type FixtureRound = {
   unassigned: FixturePlayer[];
 };
 
-function courtLabel(court: number, total: number) {
-  if (total <= 1) return 'Kings court';
-  if (court === 1) return 'Kings court';
-  if (court === total) return 'Queens court';
+function courtLabel(court: number, _total: number) {
+  if (court === 1) return 'Kings & Queens';
   return `Court ${court}`;
 }
 
@@ -90,8 +88,8 @@ function sidePlayers(side: FixtureSide): FixturePlayer[] {
  * - Losers move DOWN a court (toward Queens)
  * - Partners always split when reforming teams
  *
- * Court 1 (Kings): winners stay + winners up from court 2
- * Court N (Queens): losers stay + losers down from court N-1
+ * Court 1 (Kings & Queens): winners stay + winners up from court 2
+ * Court N (bottom): losers stay + losers down from court N-1
  * Middle: losers from above + winners from below
  */
 export function generateNextKingsAndQueensRound(
@@ -122,10 +120,10 @@ export function generateNextKingsAndQueensRound(
       // Single court: winners vs losers, partners split
       pool = [...winners[0]!, ...losers[0]!];
     } else if (i === 0) {
-      // Kings: winners stay + winners from court 2
+      // Kings & Queens: winners stay + winners from court 2
       pool = [...winners[0]!, ...winners[1]!];
     } else if (i === n - 1) {
-      // Queens: losers stay + losers from court above
+      // Bottom court: losers stay + losers from court above
       pool = [...losers[n - 1]!, ...losers[n - 2]!];
     } else {
       // Middle: losers from court above + winners from court below

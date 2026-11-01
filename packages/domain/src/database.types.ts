@@ -572,6 +572,7 @@ export type Database = {
       }
       groups: {
         Row: {
+          avatar_url: string | null
           cover_url: string | null
           created_at: string
           created_by: string
@@ -589,6 +590,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["group_visibility"]
         }
         Insert: {
+          avatar_url?: string | null
           cover_url?: string | null
           created_at?: string
           created_by: string
@@ -606,6 +608,7 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
         Update: {
+          avatar_url?: string | null
           cover_url?: string | null
           created_at?: string
           created_by?: string
@@ -2193,7 +2196,7 @@ export type Database = {
       registration_status: "registered" | "waitlist" | "selected" | "payment_claimed" | "paid" | "cancelled" | "no_show"
       report_status: "pending" | "scraping" | "analyzing" | "ready" | "failed"
       review_source: "google" | "tripadvisor" | "trustpilot"
-      session_format: "kings_and_queens" | "americano" | "mexicano" | "custom"
+      session_format: "kings_and_queens" | "americano" | "mexicano" | "tournament_by_wins" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2327,7 +2330,7 @@ export const Constants = {
       registration_status: ["registered", "waitlist", "selected", "payment_claimed", "paid", "cancelled", "no_show"],
       report_status: ["pending", "scraping", "analyzing", "ready", "failed"],
       review_source: ["google", "tripadvisor", "trustpilot"],
-      session_format: ["kings_and_queens", "americano", "mexicano", "custom"],
+      session_format: ["kings_and_queens", "americano", "mexicano", "tournament_by_wins", "custom"],
     },
   },
 } as const

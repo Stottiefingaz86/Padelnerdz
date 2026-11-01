@@ -1,11 +1,19 @@
 import {
   allMatchesScored,
   applyMatchScore,
+  applyTournamentMatchScore,
+  advanceTournamentByWins,
+  DEFAULT_TOURNAMENT_BY_WINS_CONFIG,
   generateKingsAndQueensRound1,
   generateNextKingsAndQueensRound,
+  isTournamentByWinsRound,
   resultsFromRound,
+  seedTournamentByWins,
+  tournamentAdvanceLabel,
   type FixturePlayer,
   type FixtureRound,
+  type SessionFormat,
+  type TournamentByWinsRound,
 } from '@padel-nerdz/domain';
 
 import {
@@ -17,7 +25,8 @@ import {
 } from './demo-store';
 import { getSupabaseLoose, isSupabaseConfigured } from './supabase';
 
-export type { FixtureRound, FixturePlayer };
+export type { FixtureRound, FixturePlayer, TournamentByWinsRound };
+export { isTournamentByWinsRound, tournamentAdvanceLabel };
 
 export type ScoreStatus = 'proposed' | 'confirmed' | 'disputed' | null;
 
@@ -28,16 +37,28 @@ export type CourtScoreMeta = {
   confirmed_by: string | null;
 };
 
+export type SessionFixtureState = FixtureRound | TournamentByWinsRound;
+
+async function loadSessionFormat(sessionId: string): Promise<SessionFormat> {
+  const { data } = await getSupabaseLoose()
+    .from('sessions')
+    .select('format')
+    .eq('id', sessionId)
+    .maybeSingle();
+  return ((data?.format as SessionFormat) ?? 'kings_and_queens') as SessionFormat;
+}
+
 async function loadPaidPlayers(sessionId: string): Promise<{
   players: FixturePlayer[];
   courts: number;
+  format: SessionFormat;
 }> {
   const { data: session } = await getSupabaseLoose()
     .from('sessions')
-    .select('id, courts')
+    .select('id, courts, format')
     .eq('id', sessionId)
     .maybeSingle();
-  if (!session) return { players: [], courts: 1 };
+  if (!session) return { players: [], courts: 1, format: 'kings_and_queens' };
 
   const { data: regs } = await getSupabaseLoose()
     .from('session_registrations')
@@ -52,10 +73,43 @@ async function loadPaidPlayers(sessionId: string): Promise<{
       'Player',
   }));
 
-  return { players, courts: Math.max(1, (session.courts as number) ?? 1) };
+  return {
+    players,
+    courts: Math.max(1, (session.courts as number) ?? 1),
+    format: (session.format as SessionFormat) ?? 'kings_and_queens',
+  };
 }
 
-async function saveLiveRound(sessionId: string, round: FixtureRound) {
+function generateForFormat(
+  format: SessionFormat,
+  players: FixturePlayer[],
+  courts: number,
+): SessionFixtureState {
+  if (format === 'tournament_by_wins') {
+    // Scale groups to the paid field: prefer A+B with 2 groups when we have enough teams.
+    const teamCount = Math.floor(players.length / 2);
+    let config = { ...DEFAULT_TOURNAMENT_BY_WINS_CONFIG };
+    if (teamCount < 12) {
+      // One category, two groups of 3–4
+      config = {
+        categories: ['A'],
+        groups_per_category: 2,
+        teams_per_group: teamCount >= 8 ? 4 : 3,
+      };
+    } else if (teamCount < 16) {
+      config = {
+        categories: ['A', 'B'],
+        groups_per_category: 2,
+        teams_per_group: 3,
+      };
+    }
+    void courts;
+    return seedTournamentByWins(players, config);
+  }
+  return generateKingsAndQueensRound1(players, courts);
+}
+
+async function saveLiveRound(sessionId: string, round: SessionFixtureState) {
   const { error } = await getSupabaseLoose().from('session_fixture_rounds').upsert(
     {
       session_id: sessionId,
@@ -68,7 +122,7 @@ async function saveLiveRound(sessionId: string, round: FixtureRound) {
   if (error) throw error;
 }
 
-async function loadLatestLiveRound(sessionId: string): Promise<FixtureRound | null> {
+async function loadLatestLiveRound(sessionId: string): Promise<SessionFixtureState | null> {
   const { data, error } = await getSupabaseLoose()
     .from('session_fixture_rounds')
     .select('payload')
@@ -78,7 +132,7 @@ async function loadLatestLiveRound(sessionId: string): Promise<FixtureRound | nu
     .maybeSingle();
   if (error) throw error;
   if (!data?.payload) return null;
-  return data.payload as FixtureRound;
+  return data.payload as SessionFixtureState;
 }
 
 export async function listCourtScoreMeta(
@@ -106,35 +160,35 @@ export async function ensureSessionFixtures(input: {
   sessionId: string;
   isGuest: boolean;
   force?: boolean;
-}): Promise<FixtureRound | null> {
+}): Promise<SessionFixtureState | null> {
   if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
     const existing = getDemoFixtures(input.sessionId);
-    if (existing && !input.force) return existing;
+    if (existing && !input.force) return existing as SessionFixtureState;
 
     if (input.force) {
       const session = getDemoSession(input.sessionId);
       if (!session) return null;
       const paid = listDemoRegistrations(input.sessionId).filter((r) => r.status === 'paid');
-      if (paid.length < 4) return existing ?? null;
+      if (paid.length < 4) return (existing as SessionFixtureState) ?? null;
       const players: FixturePlayer[] = paid
         .sort((a, b) => b.reliability - a.reliability)
         .map((r) => ({ user_id: r.user_id, display_name: r.display_name }));
-      const round = generateKingsAndQueensRound1(players, session.courts);
+      const round = generateForFormat(session.format, players, session.courts);
       saveDemoFixtures(input.sessionId, round);
       return round;
     }
 
     maybeGenerateDemoFixturesAfterPayment(input.sessionId);
-    return getDemoFixtures(input.sessionId) ?? null;
+    return (getDemoFixtures(input.sessionId) as SessionFixtureState) ?? null;
   }
 
   const existing = await loadLatestLiveRound(input.sessionId);
   if (existing && !input.force) return existing;
 
-  const { players, courts } = await loadPaidPlayers(input.sessionId);
+  const { players, courts, format } = await loadPaidPlayers(input.sessionId);
   if (players.length < 4) return existing ?? null;
 
-  const round = generateKingsAndQueensRound1(players, courts);
+  const round = generateForFormat(format, players, courts);
   await saveLiveRound(input.sessionId, round);
   return round;
 }
@@ -142,9 +196,9 @@ export async function ensureSessionFixtures(input: {
 export async function getSessionFixtures(
   sessionId: string,
   isGuest: boolean,
-): Promise<FixtureRound | null> {
+): Promise<SessionFixtureState | null> {
   if (isGuest || !isSupabaseConfigured || sessionId.startsWith('demo-')) {
-    return getDemoFixtures(sessionId) ?? null;
+    return (getDemoFixtures(sessionId) as SessionFixtureState) ?? null;
   }
   return loadLatestLiveRound(sessionId);
 }
@@ -158,10 +212,13 @@ export async function setMatchScore(input: {
   scoreB: number;
   userId?: string;
   organiserForce?: boolean;
-}): Promise<FixtureRound | null> {
+}): Promise<SessionFixtureState | null> {
   const current = await getSessionFixtures(input.sessionId, input.isGuest);
   if (!current) return null;
-  const next = applyMatchScore(current, input.court, input.scoreA, input.scoreB);
+
+  const next = isTournamentByWinsRound(current)
+    ? applyTournamentMatchScore(current, input.court, input.scoreA, input.scoreB)
+    : applyMatchScore(current, input.court, input.scoreA, input.scoreB);
 
   if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
     saveDemoFixtures(input.sessionId, next);
@@ -239,7 +296,7 @@ export async function disputeMatchScore(input: {
 
 export async function allCourtsConfirmed(
   sessionId: string,
-  round: FixtureRound,
+  round: SessionFixtureState,
   isGuest: boolean,
 ): Promise<boolean> {
   if (!allMatchesScored(round)) return false;
@@ -259,9 +316,39 @@ export async function advanceToNextRound(input: {
   sessionId: string;
   isGuest: boolean;
   forceUnconfirmed?: boolean;
-}): Promise<{ round: FixtureRound | null; error?: string }> {
+}): Promise<{ round: SessionFixtureState | null; error?: string }> {
   const current = await getSessionFixtures(input.sessionId, input.isGuest);
   if (!current) return { round: null, error: 'No fixtures yet — players must pay first' };
+
+  if (isTournamentByWinsRound(current)) {
+    if (current.phase === 'complete') {
+      return { round: current, error: 'Tournament is complete' };
+    }
+    if (!allMatchesScored(current)) {
+      return {
+        round: current,
+        error: 'Enter a score on every match before advancing',
+      };
+    }
+    if (!input.forceUnconfirmed) {
+      const ok = await allCourtsConfirmed(input.sessionId, current, input.isGuest);
+      if (!ok) {
+        return {
+          round: current,
+          error: 'Every match needs a confirmed score (or organiser force) before advancing',
+        };
+      }
+    }
+    const result = advanceTournamentByWins(current);
+    if (result.error) return { round: current, error: result.error };
+    if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
+      saveDemoFixtures(input.sessionId, result.state);
+    } else {
+      await saveLiveRound(input.sessionId, result.state);
+    }
+    return { round: result.state };
+  }
+
   if (!allMatchesScored(current)) {
     return { round: current, error: 'Enter a score on every court before generating the next round' };
   }
@@ -282,4 +369,12 @@ export async function advanceToNextRound(input: {
     await saveLiveRound(input.sessionId, next);
   }
   return { round: next };
+}
+
+/** @deprecated kept for callers that only need format string */
+export async function getLiveSessionFormat(sessionId: string): Promise<SessionFormat> {
+  if (sessionId.startsWith('demo-')) {
+    return getDemoSession(sessionId)?.format ?? 'kings_and_queens';
+  }
+  return loadSessionFormat(sessionId);
 }
