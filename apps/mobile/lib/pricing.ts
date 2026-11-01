@@ -1,18 +1,20 @@
 /**
  * Player-facing price hides the platform cut.
- * Organiser sets court share (e.g. €14). We add platform fee + Spanish IVA on the fee.
+ * Organiser sets court share (e.g. €14). We take 8% of that + Spanish IVA on the fee.
  *
- * Example: €14.00 court + €1.00 fee + 21% IVA on fee (€0.21) → player pays €15.21
- * Platform expected take: €1.21 (fee + IVA) — only visible on owner dashboard.
+ * Example: €14.00 court → €1.12 fee (8%) + €0.24 IVA (21% on fee) → player pays €15.36
+ * Platform take: €1.36 (fee + IVA) — only visible on owner / admin surfaces.
  */
 
-export const PLATFORM_FEE_CENTS = 100; // €1.00
-export const PLATFORM_IVA_RATE = 0.21; // Spain standard VAT on digital services
+/** Share of event (court) fee kept by the platform before IVA */
+export const PLATFORM_FEE_RATE = 0.08;
+/** Spain standard VAT on the platform service fee */
+export const PLATFORM_IVA_RATE = 0.21;
 
 export type PriceBreakdown = {
   /** What the organiser entered (court / host share) */
   courtCents: number;
-  /** Net platform fee before tax */
+  /** Net platform fee before tax (8% of court) */
   feeCents: number;
   /** IVA on the platform fee only */
   ivaCents: number;
@@ -22,12 +24,25 @@ export type PriceBreakdown = {
   playerTotalCents: number;
 };
 
+/** Platform fee (ex-IVA) for a court price — always derived from the event fee. */
+export function platformFeeCents(courtCents: number | null | undefined): number {
+  const court = Math.max(0, courtCents ?? 0);
+  return Math.round(court * PLATFORM_FEE_RATE);
+}
+
+/**
+ * @param courtCents Organiser court / event price
+ * @param feeCents Optional override (tests / legacy). Omit to use 8% of court.
+ */
 export function priceBreakdown(
   courtCents: number | null | undefined,
-  feeCents: number = PLATFORM_FEE_CENTS,
+  feeCents?: number | null,
 ): PriceBreakdown {
   const court = Math.max(0, courtCents ?? 0);
-  const fee = Math.max(0, feeCents);
+  const fee =
+    feeCents != null && Number.isFinite(feeCents)
+      ? Math.max(0, Math.round(feeCents))
+      : platformFeeCents(court);
   const ivaCents = Math.round(fee * PLATFORM_IVA_RATE);
   const platformTakeCents = fee + ivaCents;
   return {
@@ -38,6 +53,9 @@ export function priceBreakdown(
     playerTotalCents: court + platformTakeCents,
   };
 }
+
+/** @deprecated Use platformFeeCents(court) — fixed €1 fee removed */
+export const PLATFORM_FEE_CENTS = 100;
 
 export function formatMoney(cents: number, currency: 'EUR' | 'GBP' = 'EUR') {
   const value = cents / 100;

@@ -24,7 +24,7 @@ import {
   getGroupPaymentSettings,
   isStripePayoutReady,
 } from '@/lib/payments';
-import { formatMoney, PLATFORM_FEE_CENTS, priceBreakdown } from '@/lib/pricing';
+import { formatMoney, platformFeeCents, priceBreakdown } from '@/lib/pricing';
 import { MIXIN_FORMATS } from '@/lib/session-formats';
 import { createMixIn } from '@/lib/sessions';
 
@@ -142,7 +142,9 @@ export default function CreateMixInScreen() {
         maxPlayers: Math.max(4, Number(maxPlayers) || 8),
         priceCents: price.trim() ? Math.round(Number(price.replace(',', '.')) * 100) : null,
         // Platform fee is fixed server-side — never shown as a line item to players
-        commissionCents: PLATFORM_FEE_CENTS,
+        commissionCents: platformFeeCents(
+          price.trim() ? Math.round(Number(price.replace(',', '.')) * 100) : 0,
+        ),
         bannerUrl: bannerUri,
       });
       router.replace(`/group/${id}/chat`);

@@ -938,7 +938,9 @@ export function createDemoSession(input: {
     courts: input.courts,
     max_players: input.max_players,
     price_cents: input.price_cents,
-    commission_cents: input.commission_cents ?? 100,
+    commission_cents:
+      input.commission_cents ??
+      Math.round(Math.max(0, input.price_cents ?? 0) * 0.08),
     banner_url: input.banner_url ?? null,
     registered_count: 0,
     session_room_id: null,
@@ -964,11 +966,12 @@ export function createDemoSession(input: {
       courts: session.courts,
       price_cents: session.price_cents,
       commission_cents: session.commission_cents,
-      // Court + €1 fee + IVA on fee — single player-facing total
-      player_total_cents:
-        (session.price_cents ?? 0) +
-        session.commission_cents +
-        Math.round(session.commission_cents * 0.21),
+      // Court + 8% fee + IVA on fee — single player-facing total
+      player_total_cents: (() => {
+        const court = session.price_cents ?? 0;
+        const fee = Math.round(court * 0.08);
+        return court + fee + Math.round(fee * 0.21);
+      })(),
       banner_url: session.banner_url,
     },
   });

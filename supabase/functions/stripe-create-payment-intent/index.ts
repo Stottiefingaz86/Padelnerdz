@@ -70,17 +70,20 @@ function corsHeaders(req: Request) {
 }
 
 
-const PLATFORM_FEE_CENTS = 100;
+/** 8% of event (court) fee + 21% IVA on that fee */
+const PLATFORM_FEE_RATE = 0.08;
 const PLATFORM_IVA_RATE = 0.21;
 
 function priceBreakdown(courtCents: number) {
-  const fee = PLATFORM_FEE_CENTS;
+  const court = Math.max(0, courtCents);
+  const fee = Math.round(court * PLATFORM_FEE_RATE);
   const ivaCents = Math.round(fee * PLATFORM_IVA_RATE);
   const platformTakeCents = fee + ivaCents;
   return {
-    courtCents: Math.max(0, courtCents),
+    courtCents: court,
+    feeCents: fee,
     platformTakeCents,
-    playerTotalCents: Math.max(0, courtCents) + platformTakeCents,
+    playerTotalCents: court + platformTakeCents,
   };
 }
 

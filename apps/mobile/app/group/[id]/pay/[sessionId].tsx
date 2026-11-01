@@ -18,7 +18,7 @@ import {
   waitForStripePaymentUnlock,
   type GroupPaymentSettings,
 } from '@/lib/payments';
-import { formatMoney, PLATFORM_FEE_CENTS, priceBreakdown } from '@/lib/pricing';
+import { formatMoney, priceBreakdown } from '@/lib/pricing';
 import { ensurePaidSessionRoomAccess, getSession, type SessionSummary } from '@/lib/sessions';
 import { useStripePay } from '@/lib/stripe-pay';
 
@@ -58,10 +58,7 @@ export default function PayScreen() {
     }, [load]),
   );
 
-  const breakdown = priceBreakdown(
-    session?.price_cents,
-    session?.commission_cents ?? PLATFORM_FEE_CENTS,
-  );
+  const breakdown = priceBreakdown(session?.price_cents);
   const amount = formatMoney(breakdown.playerTotalCents);
   const stripeReady = settings ? isStripePayoutReady(settings) : false;
   const stripeConfigured = Boolean(stripePublishableKey());

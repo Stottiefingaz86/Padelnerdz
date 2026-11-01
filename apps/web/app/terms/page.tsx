@@ -53,9 +53,9 @@ export default function TermsPage() {
             <p>
               Mix-in places are paid in-app via Stripe Connect. The player pays
               one total; the organiser’s connected Stripe account receives the
-              court share, and Padel Nerdz retains a platform service fee
-              (including applicable IVA) as an application fee. Payout timing
-              follows Stripe’s schedules and organiser onboarding status.
+              court share, and Padel Nerdz retains a platform service fee of 8%
+              of the event fee plus applicable IVA as an application fee. Payout
+              timing follows Stripe’s schedules and organiser onboarding status.
             </p>
           </section>
 
