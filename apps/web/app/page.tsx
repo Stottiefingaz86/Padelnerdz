@@ -12,14 +12,20 @@ import {
 } from "@/components/landing";
 import { FormatsPanel } from "@/components/formats-panel";
 import { KqDemo } from "@/components/kq-demo";
+import { NavDrawer } from "@/components/nav-drawer";
 import { BrandSection } from "@/components/pattern-band";
 import { WrapStoryCluster } from "@/components/wrap-story";
 
 const MISSIONS = [
   {
+    src: "/missions/first_group.png",
+    title: "Find your crew",
+    body: "Join a group.",
+  },
+  {
     src: "/missions/first_mixin.png",
     title: "First mix-in",
-    body: "Lock your first paid place.",
+    body: "Lock a paid place.",
   },
   {
     src: "/missions/first_pay.png",
@@ -27,14 +33,19 @@ const MISSIONS = [
     body: "Confirm with Stripe.",
   },
   {
-    src: "/missions/mixins_10.png",
-    title: "Circuit regular",
-    body: "Ten sessions deep.",
+    src: "/missions/reliable_5.png",
+    title: "Shows up",
+    body: "Reliability locked.",
+  },
+  {
+    src: "/missions/host_first.png",
+    title: "First host",
+    body: "Create a mix-in.",
   },
   {
     src: "/missions/wins_3.png",
-    title: "On a run",
-    body: "Stack match wins.",
+    title: "Hat-trick",
+    body: "Three session wins.",
   },
   {
     src: "/missions/podium_5.png",
@@ -43,8 +54,8 @@ const MISSIONS = [
   },
   {
     src: "/missions/mixin_winner.png",
-    title: "Session king",
-    body: "Take the mix-in.",
+    title: "Mix-in winner",
+    body: "Take the night.",
   },
 ] as const;
 
@@ -85,34 +96,28 @@ export default function HomePage() {
           className="object-cover object-center land-fade"
           sizes="100vw"
         />
+        {/* Film/TV grain sits on the photo, under the vignette */}
+        <div className="land-tv-grain pointer-events-none absolute inset-0" aria-hidden />
         <div
-          className="absolute inset-0"
+          className="pointer-events-none absolute inset-0 z-[2]"
           style={{
             background:
               "radial-gradient(ellipse 85% 70% at 50% 45%, rgba(15,17,21,0.28) 0%, rgba(15,17,21,0.58) 55%, rgba(15,17,21,0.94) 100%), linear-gradient(180deg, rgba(15,17,21,0.55) 0%, transparent 28%, transparent 55%, #0F1115 100%)",
           }}
         />
 
-        <header className="relative z-10 flex items-center justify-between px-6 pt-6 sm:px-10">
-          <Image
-            src="/brand-crown.png"
-            alt="Padel Nerdz"
-            width={64}
-            height={64}
-            className="h-9 w-9 object-contain mix-blend-screen sm:h-10 sm:w-10"
-            priority
-          />
-          <nav className="flex items-center gap-5 text-sm font-medium text-[#B5B5B5]">
-            <Link href="/support" className="transition hover:text-white">
-              Support
-            </Link>
-            <Link href="/privacy" className="transition hover:text-white">
-              Privacy
-            </Link>
-            <Link href="/terms" className="transition hover:text-white">
-              Terms
-            </Link>
-          </nav>
+        <header className="relative z-20 flex items-center justify-between px-6 pt-6 sm:px-10">
+          <Link href="/" aria-label="Padel Nerdz home">
+            <Image
+              src="/brand-crown.png"
+              alt="Padel Nerdz"
+              width={64}
+              height={64}
+              className="h-9 w-9 object-contain mix-blend-screen sm:h-10 sm:w-10"
+              priority
+            />
+          </Link>
+          <NavDrawer />
         </header>
 
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-10 text-center sm:px-10">
@@ -348,9 +353,9 @@ export default function HomePage() {
                 <Image
                   src="/app-discover.jpg"
                   alt="Discover groups near you"
-                  width={720}
-                  height={480}
-                  className="aspect-[4/3] w-full object-cover"
+                  width={1024}
+                  height={576}
+                  className="aspect-video w-full object-cover object-center"
                 />
                 <figcaption className="px-4 py-3.5">
                   <p className="land-display text-sm font-bold text-white">Discover</p>
@@ -448,7 +453,7 @@ export default function HomePage() {
             point, not a side badge.
           </SectionHeading>
 
-          <ul className="mt-14 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
+          <ul className="mt-14 grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-4">
             {MISSIONS.map((m) => (
               <li key={m.title} className="flex flex-col items-center text-center">
                 <Image
@@ -514,21 +519,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Download — tiled brand pattern fills the whole section (no mid cut-off) */}
+      {/* Download — one brand image fills the section */}
       <section
         id="download"
         className="relative overflow-hidden bg-[#0F1115] px-6 py-28 sm:px-10"
       >
-        <div
-          className="pointer-events-none absolute inset-0 opacity-80"
-          style={{
-            backgroundColor: "#0F1115",
-            backgroundImage: "url(/brand-pattern.png)",
-            backgroundRepeat: "repeat",
-            backgroundPosition: "center top",
-            // Fixed width keeps logos sharp; height follows 1024×448 aspect
-            backgroundSize: "280px auto",
-          }}
+        <Image
+          src="/brand-pattern.png"
+          alt=""
+          fill
+          className="object-cover object-center opacity-80"
+          sizes="100vw"
           aria-hidden
         />
         <div
@@ -567,7 +568,7 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-[#222] px-6 py-10 text-sm text-[#7A7A7A] sm:px-10">
-        <div className="mx-auto flex max-w-5xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Image
               src="/logo-wordmark.png"
@@ -578,17 +579,9 @@ export default function HomePage() {
             />
             <span>© {new Date().getFullYear()} Padel Nerdz</span>
           </div>
-          <div className="flex flex-wrap gap-6">
-            <Link href="/privacy" className="transition hover:text-white">
-              Privacy
-            </Link>
-            <Link href="/terms" className="transition hover:text-white">
-              Terms
-            </Link>
-            <Link href="/support" className="transition hover:text-white">
-              Support
-            </Link>
-          </div>
+          <Link href="/terms" className="transition hover:text-white">
+            Terms of Service
+          </Link>
         </div>
       </footer>
     </main>
