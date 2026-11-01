@@ -151,11 +151,13 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
       "No phone profiles yet. Enable Twilio Verify in Supabase Auth → Phone, or set TWILIO_VERIFY_READY=true after wiring it.";
   }
 
-  const stripeLiveReady =
+  const stripeConnected =
     stripe.configured &&
-    stripe.mode === "live" &&
     stripe.chargesEnabled &&
+    stripe.detailsSubmitted &&
     !stripe.error;
+  /** Green only for live money; test Connect is wired but not “live”. */
+  const stripeLiveReady = stripeConnected && stripe.mode === "live";
   let stripeDetail: string;
   if (!stripe.configured) {
     stripeDetail =
@@ -163,7 +165,9 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
   } else if (stripe.error && !stripe.accountId) {
     stripeDetail = stripe.error;
   } else if (!stripe.detailsSubmitted || !stripe.chargesEnabled) {
-    stripeDetail = `Keys wired (${stripe.mode}) on ${stripe.accountId ?? "account"} — open Stripe account onboarding and finish as an individual (name, ID, bank). You do not need a company or tax advisor for that step.`;
+    stripeDetail = `Keys wired (${stripe.mode}) on ${stripe.accountId ?? "account"} — open Stripe Dashboard → Connect / account onboarding and finish as an individual (name, ID, bank).`;
+  } else if (stripe.mode === "test") {
+    stripeDetail = `Test Connect OK · ${stripe.accountId} · ${stripe.country?.toUpperCase() ?? "?"} · charges on. Still red until you switch Vercel to sk_live_ / pk_live_ keys for real payments.`;
   } else {
     stripeDetail = `Live Connect · ${stripe.accountId} · ${stripe.country?.toUpperCase() ?? "?"} · destination charges keep fee+IVA on the platform.`;
   }
