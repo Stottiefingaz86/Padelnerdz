@@ -10,7 +10,7 @@ export default function PrivacyPage() {
     <main className="min-h-screen bg-[#0F1115] px-6 py-12 text-white sm:px-10">
       <div className="mx-auto max-w-2xl">
         <Link href="/" className="text-sm text-[#C8FF2E]">
-          ← Padel Nerdz
+          ← Mixy
         </Link>
         <h1 className="mt-8 text-4xl font-bold tracking-[-0.03em]">Privacy Policy</h1>
         <p className="mt-2 text-sm text-[#7A7A7A]">Last updated: 30 October 2026</p>
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-white">Who we are</h2>
             <p>
-              Padel Nerdz (“we”, “us”) provides a mobile app for padel groups,
+              Mixy (“we”, “us”) provides a mobile app for padel groups,
               session rooms, chat, and payment coordination. Contact:{" "}
               <a className="text-[#C8FF2E]" href="mailto:support@padelnerdz.com">
                 support@padelnerdz.com
@@ -81,7 +81,7 @@ export default function PrivacyPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-white">Children</h2>
             <p>
-              Padel Nerdz is not directed at children under 16. If you believe a
+              Mixy is not directed at children under 16. If you believe a
               minor has created an account, contact us and we will remove it.
             </p>
           </section>

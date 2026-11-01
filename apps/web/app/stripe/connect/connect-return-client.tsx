@@ -37,7 +37,7 @@ export function ConnectReturnClient({ groupId, stripe }: Props) {
           PN
         </div>
         <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#C8FF2E]">
-          Padel Nerdz
+          Mixy
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em]">
           {stripe === 'refresh' ? 'Continue payout setup' : 'You’re back'}
@@ -45,7 +45,7 @@ export function ConnectReturnClient({ groupId, stripe }: Props) {
         <p className="mt-3 text-[15px] leading-relaxed text-[#B5B5B5]">
           {groupId
             ? tried
-              ? 'Opening Padel Nerdz… If nothing happens, tap below.'
+              ? 'Opening Mixy… If nothing happens, tap below.'
               : 'Returning you to unlock mix-in payouts…'
             : 'Missing group — open Payouts from Admin in the app.'}
         </p>
@@ -55,7 +55,7 @@ export function ConnectReturnClient({ groupId, stripe }: Props) {
             href={deepLink}
             className="mt-8 inline-flex min-h-13 w-full items-center justify-center rounded-2xl bg-[#C8FF2E] px-6 text-base font-extrabold text-[#0F1115]"
           >
-            Open Padel Nerdz
+            Open Mixy
           </a>
         ) : null}
 

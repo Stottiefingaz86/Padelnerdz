@@ -146,7 +146,7 @@ export function TicketMock({ className = "" }: { className?: string }) {
     >
       <div className="rounded-b-[4px] bg-[#C8FF2E] px-5 py-4 text-[#0F1115]">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold tracking-[0.16em]">PADEL NERDZ</span>
+          <span className="text-[10px] font-bold tracking-[0.16em]">MIXY</span>
           <span className="rounded-full bg-[#0F1115] px-2.5 py-1 text-[10px] font-bold text-[#C8FF2E]">
             SESSION
           </span>

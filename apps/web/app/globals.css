@@ -241,184 +241,84 @@ a {
   animation-delay: 1.3s;
 }
 
+/* Scroll cue — soft bob + wheel drip */
+.land-scroll {
+  animation: land-scroll-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes land-scroll-bob {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, 5px);
+  }
+}
+
 @keyframes land-mouse-wheel {
   0% {
     transform: translate(-50%, 0);
     opacity: 1;
   }
-  70% {
-    transform: translate(-50%, 10px);
+  55% {
+    transform: translate(-50%, 7px);
     opacity: 0;
   }
+  56%,
   100% {
-    transform: translate(-50%, 10px);
+    transform: translate(-50%, 0);
     opacity: 0;
   }
 }
 
 .land-mouse__wheel {
-  animation: land-mouse-wheel 1.55s ease-in-out infinite;
+  animation: land-mouse-wheel 1.85s cubic-bezier(0.45, 0, 0.2, 1) infinite;
   will-change: transform, opacity;
 }
 
-/* Hero logo glitch — intermittent RGB split + slice */
+/* Hero logo — white flicker only */
 .land-glitch {
-  position: relative;
   display: inline-block;
-  isolation: isolate;
 }
 
 .land-glitch__img {
-  position: relative;
-  z-index: 1;
   display: block;
   width: 100%;
   height: auto;
+  animation: land-glitch-flicker 4.8s steps(1, end) infinite;
 }
 
-.land-glitch::before,
-.land-glitch::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: url("/logo-wordmark.png");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  pointer-events: none;
-  opacity: 0;
-  mix-blend-mode: screen;
-  z-index: 2;
-}
-
-.land-glitch::before {
-  animation: land-glitch-cyan 5.5s steps(1, end) infinite;
-}
-
-.land-glitch::after {
-  animation: land-glitch-lime 5.5s steps(1, end) infinite;
-}
-
-.land-glitch__img {
-  animation: land-glitch-base 5.5s steps(1, end) infinite;
-}
-
-@keyframes land-glitch-base {
+@keyframes land-glitch-flicker {
   0%,
-  88%,
+  86%,
   100% {
-    transform: translate(0);
-    filter: none;
-    clip-path: none;
+    opacity: 1;
+  }
+  87% {
+    opacity: 0.15;
+  }
+  88% {
+    opacity: 1;
   }
   89% {
-    transform: translate(3px, -1px);
-    filter: contrast(1.15) brightness(1.08);
-    clip-path: inset(18% 0 55% 0);
+    opacity: 0.35;
   }
   90% {
-    transform: translate(-4px, 1px);
-    clip-path: inset(42% 0 28% 0);
+    opacity: 1;
   }
-  91% {
-    transform: translate(2px, 0);
-    clip-path: inset(8% 0 70% 0);
+  94% {
+    opacity: 0.2;
   }
-  92%,
-  93% {
-    transform: translate(0);
-    filter: none;
-    clip-path: none;
+  95% {
+    opacity: 1;
+  }
+  95.5% {
+    opacity: 0.55;
   }
   96% {
-    transform: translate(-2px, 0);
-    filter: contrast(1.2);
+    opacity: 1;
   }
-  97% {
-    transform: translate(0);
-    filter: none;
-  }
-}
-
-@keyframes land-glitch-cyan {
-  0%,
-  88%,
-  92%,
-  100% {
-    opacity: 0;
-    transform: translate(0);
-    clip-path: none;
-  }
-  89% {
-    opacity: 0.75;
-    transform: translate(-6px, 1px);
-    clip-path: inset(12% 0 48% 0);
-  }
-  90% {
-    opacity: 0.65;
-    transform: translate(-9px, -1px);
-    clip-path: inset(50% 0 20% 0);
-  }
-  91% {
-    opacity: 0.5;
-    transform: translate(5px, 0);
-    clip-path: inset(0 0 78% 0);
-  }
-  96% {
-    opacity: 0.4;
-    transform: translate(-5px, 0);
-    clip-path: none;
-  }
-  97% {
-    opacity: 0;
-    transform: translate(0);
-  }
-}
-
-@keyframes land-glitch-lime {
-  0%,
-  88%,
-  92%,
-  100% {
-    opacity: 0;
-    transform: translate(0);
-    clip-path: none;
-  }
-  89% {
-    opacity: 0.9;
-    transform: translate(6px, -1px);
-    clip-path: inset(22% 0 40% 0);
-  }
-  90% {
-    opacity: 0.75;
-    transform: translate(10px, 1px);
-    clip-path: inset(58% 0 12% 0);
-  }
-  91% {
-    opacity: 0.6;
-    transform: translate(-4px, 0);
-    clip-path: inset(72% 0 0 0);
-  }
-  96% {
-    opacity: 0.5;
-    transform: translate(5px, 0);
-    clip-path: none;
-  }
-  97% {
-    opacity: 0;
-    transform: translate(0);
-  }
-}
-
-/* Tint ghost layers via colored overlays + mask feel */
-.land-glitch::before {
-  filter: brightness(0) saturate(100%) invert(78%) sepia(42%) saturate(1200%)
-    hue-rotate(146deg) brightness(105%) contrast(102%);
-}
-
-.land-glitch::after {
-  filter: brightness(0) saturate(100%) invert(88%) sepia(64%) saturate(900%)
-    hue-rotate(18deg) brightness(105%) contrast(108%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -427,14 +327,8 @@ a {
   .land-medal,
   .land-float,
   .land-mouse__wheel,
-  .land-glitch::before,
-  .land-glitch::after,
+  .land-scroll,
   .land-glitch__img {
     animation: none;
-  }
-
-  .land-glitch::before,
-  .land-glitch::after {
-    opacity: 0;
   }
 }

@@ -379,5 +379,5 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
 
 export const PRICING_COPY = {
   title: "Pricing rule · Stripe Connect",
-  body: "Organiser sets court price (e.g. €14). Player pays court + €1 + 21% IVA on the €1 in one total (e.g. €15.21) via Stripe PaymentSheet — even if court is free. Destination charge: organiser receives the court share on their Connect Express account; Padel Nerdz keeps fee+IVA as application_fee_amount automatically.",
+  body: "Organiser sets court price (e.g. €14). Player pays court + €1 + 21% IVA on the €1 in one total (e.g. €15.21) via Stripe PaymentSheet — even if court is free. Destination charge: organiser receives the court share on their Connect Express account; Mixy keeps fee+IVA as application_fee_amount automatically.",
 };

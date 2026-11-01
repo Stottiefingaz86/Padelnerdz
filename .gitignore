@@ -26,3 +26,4 @@ apps/mobile/android/
 supabase/.branches/
 supabase/.temp/
 .env.stripe.local
+.vercel

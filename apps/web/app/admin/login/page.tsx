@@ -14,7 +14,7 @@ export default async function AdminLoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#0F1115] px-6">
       <div className="w-full max-w-sm">
         <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#C8FF2E]">
-          Padel Nerdz
+          Mixy
         </p>
         <h1 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-white">
           Back office

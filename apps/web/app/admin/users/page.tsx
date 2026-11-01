@@ -23,7 +23,7 @@ export default async function AdminUsersPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#C8FF2E]">
-              Padel Nerdz · Owner
+              Mixy · Owner
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em]">Users</h1>
             <p className="mt-2 text-sm text-[#B5B5B5]">

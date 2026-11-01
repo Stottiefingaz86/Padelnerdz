@@ -27,12 +27,12 @@ const siteUrl = (() => {
 })();
 
 const siteDescription =
-  "Padel Nerdz for club owners and private groups. Mix-ins, Kings & Queens, tickets, check-in, payments, wraps, and progress in one app.";
+  "Mixy for club owners and private padel groups. Mix-ins, Kings & Queens, tickets, check-in, payments, wraps, and progress in one app.";
 
 export const metadata: Metadata = {
   title: {
-    default: "Padel Nerdz",
-    template: "%s · Padel Nerdz",
+    default: "Mixy",
+    template: "%s · Mixy",
   },
   description: siteDescription,
   metadataBase: new URL(siteUrl),
@@ -44,21 +44,21 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_GB",
     url: siteUrl,
-    siteName: "Padel Nerdz",
-    title: "Padel Nerdz",
+    siteName: "Mixy",
+    title: "Mixy",
     description: siteDescription,
     images: [
       {
         url: "/og.jpg",
         width: 1200,
         height: 630,
-        alt: "Padel Nerdz — from group chat to game on",
+        alt: "Mixy — from group chat to game on",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Padel Nerdz",
+    title: "Mixy",
     description: siteDescription,
     images: ["/og.jpg"],
   },

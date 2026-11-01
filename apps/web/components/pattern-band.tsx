@@ -10,14 +10,14 @@ type Props = {
 };
 
 /**
- * Brand wallpaper. Tile asset is ~1024×448 (seamless half-drop).
+ * Brand wallpaper. Tile asset is 1024×512 (Mixy half-drop).
  * Use a fixed width (not 100vw) so CSS repeat actually tiles.
  */
 export function BrandWallpaper({
   opacity = 0.7,
   parallax = false,
   /** CSS length for one tile width — height follows aspect */
-  tile = "320px",
+  tile = "360px",
 }: {
   opacity?: number;
   parallax?: boolean;

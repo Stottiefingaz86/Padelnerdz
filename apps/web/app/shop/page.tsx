@@ -10,7 +10,7 @@ export default function ShopPage() {
     <main className="min-h-screen bg-[#0F1115] px-6 py-12 text-white sm:px-10">
       <div className="mx-auto max-w-2xl">
         <Link href="/" className="text-sm text-[#C8FF2E]">
-          ← Padel Nerdz
+          ← Mixy
         </Link>
         <p className="mt-8 text-xs font-semibold tracking-[0.16em] text-[#C8FF2E]">
           COMING SOON

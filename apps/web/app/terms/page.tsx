@@ -10,7 +10,7 @@ export default function TermsPage() {
     <main className="min-h-screen bg-[#0F1115] px-6 py-12 text-white sm:px-10">
       <div className="mx-auto max-w-2xl">
         <Link href="/" className="text-sm text-[#C8FF2E]">
-          ← Padel Nerdz
+          ← Mixy
         </Link>
         <h1 className="mt-8 text-4xl font-bold tracking-[-0.03em]">
           Terms of Service
@@ -21,7 +21,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-white">Agreement</h2>
             <p>
-              By using Padel Nerdz you agree to these terms. If you do not agree,
+              By using Mixy you agree to these terms. If you do not agree,
               do not use the app. Contact{" "}
               <a className="text-[#C8FF2E]" href="mailto:support@padelnerdz.com">
                 support@padelnerdz.com
@@ -33,7 +33,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-white">The service</h2>
             <p>
-              Padel Nerdz helps padel communities organise groups, chat, mix-ins,
+              Mixy helps padel communities organise groups, chat, mix-ins,
               session rooms, and coordinate payments. During beta, features may
               change and availability is not guaranteed.
             </p>
@@ -53,7 +53,7 @@ export default function TermsPage() {
             <p>
               Mix-in places are paid in-app via Stripe Connect. The player pays
               one total; the organiser’s connected Stripe account receives the
-              court share, and Padel Nerdz retains a fixed platform service fee
+              court share, and Mixy retains a fixed platform service fee
               (plus applicable IVA) as an application fee — including when the
               court share is free. Payout timing follows Stripe’s schedules and
               organiser onboarding status.

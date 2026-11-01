@@ -107,54 +107,55 @@ export default function HomePage() {
         />
 
         <header className="relative z-20 flex items-center justify-between px-6 pt-6 sm:px-10">
-          <Link href="/" aria-label="Padel Nerdz home">
+          <Link href="/" aria-label="Mixy home" className="block">
             <Image
               src="/brand-crown.png"
-              alt="Padel Nerdz"
+              alt=""
               width={64}
               height={64}
               className="h-9 w-9 object-contain mix-blend-screen sm:h-10 sm:w-10"
               priority
+              aria-hidden
             />
           </Link>
           <NavDrawer />
         </header>
 
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-10 text-center sm:px-10">
-          <div className="land-rise land-glitch mx-auto w-[min(72vw,280px)] sm:w-[320px] md:w-[360px]">
+          <div className="land-rise land-glitch mx-auto w-[min(82vw,22rem)] -translate-x-1 sm:w-[26rem] sm:-translate-x-1.5 md:w-[28rem]">
             <Image
-              src="/logo-wordmark.png"
-              alt="Padel Nerdz"
-              width={480}
-              height={458}
+              src="/mixy-logo.png"
+              alt="Mixy"
+              width={1024}
+              height={683}
               priority
-              className="land-glitch__img"
+              className="land-glitch__img mx-auto h-auto w-full object-contain mix-blend-screen"
             />
           </div>
-          <h1 className="land-rise land-rise-delay-1 land-display mx-auto mt-8 max-w-3xl text-[2.35rem] font-extrabold leading-[1.05] tracking-[-0.045em] sm:text-5xl md:text-[3.35rem]">
+          <h1 className="land-rise land-rise-delay-1 land-display mx-auto mt-6 max-w-3xl text-balance text-[2.35rem] font-extrabold leading-[1.05] tracking-[-0.045em] sm:text-5xl md:text-[3.35rem]">
             From group chat to game on.
           </h1>
-          <p className="land-rise land-rise-delay-2 mx-auto mt-5 max-w-xl text-base leading-relaxed text-[#B5B5B5] sm:text-lg">
+          <p className="land-rise land-rise-delay-2 mx-auto mt-5 max-w-xl text-pretty text-base leading-relaxed text-[#B5B5B5] sm:text-lg">
             Your crew, your mix-ins, your competition. Organise games, fill
             courts, track results and celebrate every win. All in one place.
           </p>
-          <div className="land-rise land-rise-delay-3 mt-9">
+          <div className="land-rise land-rise-delay-3 mt-9 flex w-full justify-center">
             <StoreButtons />
           </div>
         </div>
 
         <a
           href="#why"
-          className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2.5 text-[#C8FF2E] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C8FF2E]"
+          className="land-scroll absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-1.5 text-[#C8FF2E] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C8FF2E]"
           aria-label="Scroll to next section"
         >
           <span
-            className="land-mouse relative block h-9 w-[22px] rounded-full border-2 border-current"
+            className="land-mouse relative block h-6 w-3.5 rounded-full border border-current"
             aria-hidden
           >
-            <span className="land-mouse__wheel absolute left-1/2 top-1.5 h-1.5 w-1 -translate-x-1/2 rounded-full bg-current" />
+            <span className="land-mouse__wheel absolute left-1/2 top-1 h-1 w-0.5 -translate-x-1/2 rounded-full bg-current" />
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.22em]">
             Scroll
           </span>
         </a>
@@ -171,12 +172,13 @@ export default function HomePage() {
               WHY THIS EXISTS
             </p>
             <h2 className="land-display mt-4 text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl md:text-[2.75rem] md:leading-[1.05]">
-              WhatsApp polls reward the fastest thumb.
+              Mix-ins shouldn’t make you fall out of love.
             </h2>
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-[#0F1115]/78 sm:text-base">
-              You play every week. You always turn up. Then a poll goes up while
-              you’re driving or busy, someone else grabs the spot, and half of
-              them ghost the court.
+              Right now they’re hit and miss. A badly organised night — wrong
+              levels, ghosting, WhatsApp chaos — can sour the whole week and
+              quietly kill why you started playing. The game’s still great. The
+              organising isn’t.
             </p>
           </div>
           <div className="rounded-[28px] border border-[#0F1115]/15 bg-[#0F1115] p-6 text-white sm:p-7">
@@ -184,11 +186,11 @@ export default function HomePage() {
               THE FIX
             </p>
             <p className="land-display mt-3 text-xl font-bold tracking-[-0.02em] sm:text-2xl">
-              Reliability beats first tap.
+              Get the love again.
             </p>
             <p className="mt-3 text-[14px] leading-relaxed text-[#B5B5B5]">
-              Interest, pay, check-in, and a track record organisers can trust
-              when they lock the lineup.
+              Interest, pay, check-in, and a track record organisers can trust —
+              so every mix-in feels like the game you fell for.
             </p>
             <ul className="mt-5 grid grid-cols-2 gap-2 text-[12px] font-semibold text-[#C8FF2E] sm:text-[13px]">
               {["Show interest", "Pay to lock", "Check in", "Build record"].map(
@@ -571,13 +573,13 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Image
-              src="/logo-wordmark.png"
-              alt="Padel Nerdz"
-              width={96}
-              height={92}
-              className="h-10 w-auto opacity-80"
+              src="/mixy-logo.png"
+              alt="Mixy"
+              width={1024}
+              height={683}
+              className="h-11 w-auto object-contain"
             />
-            <span>© {new Date().getFullYear()} Padel Nerdz</span>
+            <span>© {new Date().getFullYear()}</span>
           </div>
           <Link href="/terms" className="transition hover:text-white">
             Terms of Service
