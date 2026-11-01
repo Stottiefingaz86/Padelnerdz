@@ -95,11 +95,11 @@ export default function HomePage() {
 
         <header className="relative z-10 flex items-center justify-between px-6 pt-6 sm:px-10">
           <Image
-            src="/logo-wordmark.png"
+            src="/brand-crown.png"
             alt="Padel Nerdz"
-            width={120}
-            height={114}
-            className="h-9 w-auto opacity-90 sm:h-10"
+            width={64}
+            height={64}
+            className="h-9 w-9 object-contain mix-blend-screen sm:h-10 sm:w-10"
             priority
           />
           <nav className="flex items-center gap-5 text-sm font-medium text-[#B5B5B5]">
