@@ -16,19 +16,51 @@ const syne = Syne({
   weight: ["500", "600", "700", "800"],
 });
 
+const siteUrl = (() => {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit;
+  const prod = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (prod) return `https://${prod}`;
+  const preview = process.env.VERCEL_URL?.trim();
+  if (preview) return `https://${preview}`;
+  return "https://padelnerdz.vercel.app";
+})();
+
+const siteDescription =
+  "Padel Nerdz for club owners and private groups. Mix-ins, Kings & Queens, tickets, check-in, payments, wraps, and progress in one app.";
+
 export const metadata: Metadata = {
   title: {
     default: "Padel Nerdz",
     template: "%s · Padel Nerdz",
   },
-  description:
-    "Padel Nerdz for club owners and private groups. Mix-ins, Kings & Queens, tickets, check-in, payments, wraps, and progress in one app.",
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://padelnerdz.com",
-  ),
+  description: siteDescription,
+  metadataBase: new URL(siteUrl),
   icons: {
-    icon: [{ url: "/favicon.ico" }, { url: "/icon.png", type: "image/png" }],
+    icon: [{ url: "/icon.png", type: "image/png" }, { url: "/favicon.ico" }],
     apple: [{ url: "/apple-icon.png" }],
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_GB",
+    url: siteUrl,
+    siteName: "Padel Nerdz",
+    title: "Padel Nerdz",
+    description: siteDescription,
+    images: [
+      {
+        url: "/og.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Padel Nerdz — from group chat to game on",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Padel Nerdz",
+    description: siteDescription,
+    images: ["/og.jpg"],
   },
 };
 
