@@ -95,16 +95,19 @@ export function SectionHeading({
   title,
   children,
   align = "left",
+  crown = true,
 }: {
   eyebrow?: string;
   title: string;
   children?: ReactNode;
   align?: "left" | "center";
+  /** Show the brand crown above the heading. Default true. */
+  crown?: boolean;
 }) {
   const center = align === "center";
   return (
     <div className={center ? "text-center" : ""}>
-      <SectionCrown />
+      {crown ? <SectionCrown /> : null}
       {eyebrow ? (
         <p
           className={`text-xs font-semibold tracking-[0.18em] text-[#C8FF2E] ${

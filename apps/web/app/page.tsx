@@ -12,8 +12,10 @@ import {
 } from "@/components/landing";
 import { FormatsPanel } from "@/components/formats-panel";
 import { KqDemo } from "@/components/kq-demo";
+import { LeaderboardDemo } from "@/components/leaderboard-demo";
 import { NavDrawer } from "@/components/nav-drawer";
 import { BrandSection } from "@/components/pattern-band";
+import { ProfileProgressDemo } from "@/components/profile-progress-demo";
 import { WrapStoryCluster } from "@/components/wrap-story";
 
 const MISSIONS = [
@@ -221,8 +223,8 @@ export default function HomePage() {
               </h2>
             </div>
             <p className="max-w-sm text-[15px] leading-relaxed text-[#B5B5B5] sm:text-right">
-              All levels. Girls’ groups, guys’ groups, mixed. Same tools. You
-              choose who gets in.
+              Open clubs or invite-only crews. Same tools either way. You set
+              the levels and who plays.
             </p>
           </div>
 
@@ -472,6 +474,46 @@ export default function HomePage() {
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      {/* Gamification / group leaderboard */}
+      <section
+        id="leaderboard"
+        className="border-b border-[#222] bg-[#0F1115] px-6 pb-24 pt-8 sm:px-10"
+      >
+        <div className="mx-auto max-w-5xl">
+          <SectionCrown />
+          <div className="mt-2 grid gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start lg:gap-16">
+            <div>
+              <SectionHeading
+                crown={false}
+                eyebrow="GAMIFICATION"
+                title="Who’s topping your group."
+              >
+                Every club and private crew has its own ladder. Points from all
+                events. Filter all time, this year, or this month. Top player is
+                never a mystery.
+              </SectionHeading>
+              <ul className="mt-8 space-y-3 text-[14px] leading-relaxed text-[#B5B5B5]">
+                {[
+                  "Separate board per group or club",
+                  "Points from paid places, finishes, and play",
+                  "All time, year, and month filters",
+                ].map((line) => (
+                  <li key={line} className="flex gap-3">
+                    <span
+                      className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C8FF2E]"
+                      aria-hidden
+                    />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+              <ProfileProgressDemo />
+            </div>
+            <LeaderboardDemo />
+          </div>
         </div>
       </section>
 
