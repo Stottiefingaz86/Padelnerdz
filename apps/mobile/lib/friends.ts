@@ -22,7 +22,7 @@ const FRIENDS_KEY = 'pn.friends.v1';
 const TAG_KEY = 'pn.myFriendTag.v1';
 const REQUESTS_KEY = 'pn.friendRequests.v1';
 const OUTGOING_KEY = 'pn.friendOutgoing.v1';
-/** Legacy flag from when we auto-seeded a fake inbound request — cleared on load. */
+/** Legacy flag from when we auto-seeded a fake inbound request ,  cleared on load. */
 const REQUESTS_SEEDED_KEY = 'pn.friendRequests.seeded.v1';
 
 type FriendListener = () => void;
@@ -487,7 +487,7 @@ export async function isFriend(userIdOrTag: string, isGuest = false): Promise<bo
   return false;
 }
 
-/** @deprecated Use requestFollow — kept for call sites that still expect Friend. */
+/** @deprecated Use requestFollow ,  kept for call sites that still expect Friend. */
 export async function addFriendFromMember(input: {
   userId: string;
   displayName: string;

@@ -22,7 +22,7 @@ export default function GroupLayout() {
         contentStyle: { backgroundColor: colors.background },
         headerBackTitle: 'Back',
         headerTitleAlign: 'center',
-        // Nested stack often has no history — always show our back control.
+        // Nested stack often has no history, always show our back control.
         headerBackVisible: false,
         headerLeft: () => <HeaderBack />,
         gestureEnabled: true,

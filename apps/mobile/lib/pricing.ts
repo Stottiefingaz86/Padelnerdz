@@ -4,10 +4,10 @@
  *
  * Example: €14.00 court + €1.00 fee + 21% IVA on fee (€0.21) → player pays €15.21
  * Free / €0 court still charges the €1.21 platform take so the platform always gets paid.
- * Platform expected take: €1.21 (fee + IVA) — only visible on owner dashboard.
+ * Platform expected take: €1.21 (fee + IVA), only visible on owner dashboard.
  */
 
-export const PLATFORM_FEE_CENTS = 100; // €1.00 fixed — not a % of court
+export const PLATFORM_FEE_CENTS = 100; // €1.00 fixed, not a % of court
 export const PLATFORM_IVA_RATE = 0.21; // Spain standard VAT on digital services
 
 export type PriceBreakdown = {
@@ -17,7 +17,7 @@ export type PriceBreakdown = {
   feeCents: number;
   /** IVA on the platform fee only */
   ivaCents: number;
-  /** fee + IVA — what should accrue to Padel Nerdz */
+  /** fee + IVA, what should accrue to Padel Nerdz */
   platformTakeCents: number;
   /** Amount the player is asked to pay (single number in the app) */
   playerTotalCents: number;

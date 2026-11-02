@@ -14,7 +14,7 @@ export type DmThread = {
   context_group_id: string | null;
   last_message_at: string;
   preview: string;
-  /** Last message author — used for unread (Instagram-style bold row). */
+  /** Last message author, used for unread (Instagram-style bold row). */
   last_sender_id?: string | null;
   unread?: boolean;
 };
@@ -104,7 +104,7 @@ function orderedPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
-/** Open (or reuse) a DM — only after follow is approved (friends). */
+/** Open (or reuse) a DM, only after follow is approved (friends). */
 export async function openDmWithMember(input: {
   peerId: string;
   peerName: string;
@@ -123,7 +123,7 @@ export async function openDmWithMember(input: {
         ? 'Waiting for them to approve your follow before you can message.'
         : follow === 'incoming'
           ? 'Approve their follow request first, then you can message.'
-          : 'Follow them first — messaging unlocks after they approve.',
+          : 'Follow them first, messaging unlocks after they approve.',
     );
   }
 

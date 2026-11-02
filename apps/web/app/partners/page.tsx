@@ -14,7 +14,7 @@ export default function PartnersPage() {
         </Link>
         <h1 className="mt-8 text-4xl font-bold tracking-[-0.03em]">Partners</h1>
         <p className="mt-4 leading-relaxed text-[#B5B5B5]">
-          Clubs, brands, and organisers — partner with Mixy. More here soon.
+          Clubs, brands, and organisers, partner with Mixy. More here soon.
         </p>
         <a
           href="mailto:partners@padelnerdz.com"

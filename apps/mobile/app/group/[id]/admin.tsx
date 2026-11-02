@@ -384,7 +384,7 @@ export default function GroupAdminScreen() {
   async function registerMyself(session: SessionSummary) {
     if (!id || !userId) return;
     setRegisteringId(session.id);
-    // Optimistic — show yourself immediately even if a later reload hiccups.
+    // Optimistic ,  show yourself immediately even if a later reload hiccups.
     setRegsBySession((prev) => {
       const list = prev[session.id] ?? [];
       if (list.some((r) => r.user_id === userId)) return prev;

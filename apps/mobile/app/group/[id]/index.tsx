@@ -100,7 +100,7 @@ export default function GroupDetailScreen() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not join';
       if (msg === 'REQUEST_PENDING') {
-        setError('Request sent — an organiser will approve you in Admin.');
+        setError('Request sent, an organiser will approve you in Admin.');
       } else {
         setError(msg);
       }
@@ -366,7 +366,7 @@ export default function GroupDetailScreen() {
             ) : null}
             {needsApproval ? (
               <Text style={styles.hint}>
-                Approval group — organisers review requests in Admin. Invite codes still work.
+                Approval group, organisers review requests in Admin. Invite codes still work.
               </Text>
             ) : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -431,7 +431,7 @@ export default function GroupDetailScreen() {
         ItemSeparatorComponent={() => <View style={styles.sep} />}
         ListEmptyComponent={
           group.is_member ? (
-            <Text style={styles.hint}>No members yet — invite from contacts.</Text>
+            <Text style={styles.hint}>No members yet, invite from contacts.</Text>
           ) : (
             <View />
           )

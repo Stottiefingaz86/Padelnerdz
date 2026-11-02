@@ -127,7 +127,7 @@ a {
   animation: land-fade 1.1s ease both;
 }
 
-/* Film / TV grain — real PNG tile (SVG noise often doesn’t paint as CSS bg) */
+/* Film / TV grain,  real PNG tile (SVG noise often doesn’t paint as CSS bg) */
 .land-tv-grain {
   z-index: 1;
   opacity: 0.55;
@@ -241,7 +241,7 @@ a {
   animation-delay: 1.3s;
 }
 
-/* Scroll cue — soft bob + wheel drip */
+/* Scroll cue,  soft bob + wheel drip */
 .land-scroll {
   animation: land-scroll-bob 2.4s ease-in-out infinite;
 }
@@ -277,7 +277,7 @@ a {
   will-change: transform, opacity;
 }
 
-/* Hero logo — white flicker only */
+/* Hero logo,  white flicker only */
 .land-glitch {
   display: inline-block;
 }

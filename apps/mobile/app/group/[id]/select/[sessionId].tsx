@@ -108,7 +108,7 @@ export default function SelectPlayersScreen() {
         isGuest,
       });
       void success();
-      // Pay first — fixtures unlock after selected players confirm payment
+      // Pay first, fixtures unlock after selected players confirm payment
       router.replace(`/group/${id}/chat`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not confirm selection');
@@ -129,7 +129,7 @@ export default function SelectPlayersScreen() {
             <View style={styles.header}>
               <Text style={styles.heading}>{title}</Text>
               <Text style={styles.sub}>
-                Ranked by reliability. Tap to select — confirm with any number up to {maxPlayers}.
+                Ranked by reliability. Tap to select, confirm with any number up to {maxPlayers}.
                 Selected players pay next; courts generate after payments.
               </Text>
               <View style={styles.statRow}>

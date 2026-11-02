@@ -20,7 +20,7 @@ function isSmsUnsupported(message: string) {
   );
 }
 
-/** Solo device demos only — never on for real beta / friends. */
+/** Solo device demos only, never on for real beta / friends. */
 function allowLocalPhoneFallback() {
   return process.env.EXPO_PUBLIC_ALLOW_LOCAL_PHONE_FALLBACK === 'true';
 }

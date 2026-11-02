@@ -159,7 +159,7 @@ export function isRemoteStoragePath(pathOrUri: string | null | undefined): boole
   return v.includes('/') && !v.startsWith('/');
 }
 
-/** Web-safe no-op note — storage uploads use fetch+blob which works on native. */
+/** Web-safe no-op note, storage uploads use fetch+blob which works on native. */
 export function mediaUploadSupported() {
   return Platform.OS !== 'web' || isSupabaseConfigured;
 }

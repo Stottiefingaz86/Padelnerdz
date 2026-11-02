@@ -141,7 +141,7 @@ export default function CreateMixInScreen() {
         courts: Math.max(1, Number(courts) || 1),
         maxPlayers: Math.max(4, Number(maxPlayers) || 8),
         priceCents: price.trim() ? Math.round(Number(price.replace(',', '.')) * 100) : null,
-        // Platform fee is fixed server-side — never shown as a line item to players
+        // Platform fee is fixed server-side, never shown as a line item to players
         commissionCents: PLATFORM_FEE_CENTS,
         bannerUrl: bannerUri,
       });
@@ -158,7 +158,7 @@ export default function CreateMixInScreen() {
       <Stack.Screen options={{ title: 'Create mix-in', headerBackTitle: 'Admin' }} />
       <Screen scroll edges={['left', 'right', 'bottom']} contentStyle={styles.content}>
         <Text style={styles.intro}>
-          Posts a registration card in group chat. You confirm the lineup later — even if not full.
+          Posts a registration card in group chat. You confirm the lineup later, even if not full.
         </Text>
 
         <Pressable style={styles.bannerPick} onPress={() => void pickBanner()}>

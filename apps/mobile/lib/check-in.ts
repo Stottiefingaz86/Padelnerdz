@@ -1,4 +1,4 @@
-/** Session attendance QR — player shows, organiser scans / enters code. */
+/** Session attendance QR, player shows, organiser scans / enters code. */
 
 function hashBits(input: string): number {
   let h = 2166136261;
@@ -9,7 +9,7 @@ function hashBits(input: string): number {
   return h >>> 0;
 }
 
-/** Short stable code (no secrets) — proves session + player pairing. */
+/** Short stable code (no secrets), proves session + player pairing. */
 export function checkInCode(sessionId: string, userId: string): string {
   const n = hashBits(`${sessionId}:${userId}:pn-checkin`);
   return n.toString(36).toUpperCase().padStart(6, '0').slice(0, 6);

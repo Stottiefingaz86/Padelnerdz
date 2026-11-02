@@ -52,7 +52,7 @@ export const metadata: Metadata = {
         url: "/og.jpg",
         width: 1200,
         height: 630,
-        alt: "Mixy — from group chat to game on",
+        alt: "Mixy, from group chat to game on",
       },
     ],
   },

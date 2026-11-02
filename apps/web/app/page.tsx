@@ -86,7 +86,7 @@ const SESSION_BEATS = [
 export default function HomePage() {
   return (
     <main className="overflow-x-hidden bg-[#0F1115] text-white">
-      {/* Hero — one composition: brand, headline, line, CTAs, full-bleed court */}
+      {/* Hero, one composition: brand, headline, line, CTAs, full-bleed court */}
       <section className="relative flex min-h-[100svh] flex-col">
         <Image
           src="/landing-hero.jpg"
@@ -161,7 +161,7 @@ export default function HomePage() {
         </a>
       </section>
 
-      {/* Why — lime manifesto, not another crown heading */}
+      {/* Why, lime manifesto, not another crown heading */}
       <section
         id="why"
         className="border-y border-[#222] bg-[#C8FF2E] px-6 py-20 text-[#0F1115] sm:px-10 sm:py-24"
@@ -169,16 +169,16 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-end lg:gap-16">
           <div>
             <p className="text-xs font-semibold tracking-[0.18em] text-[#0F1115]/65">
-              WHY THIS EXISTS
+              WHY MIXY
             </p>
             <h2 className="land-display mt-4 text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl md:text-[2.75rem] md:leading-[1.05]">
-              Mix-ins shouldn’t make you fall out of love.
+              One great game changes everything.
             </h2>
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-[#0F1115]/78 sm:text-base">
-              Right now they’re hit and miss. A badly organised night — wrong
-              levels, ghosting, WhatsApp chaos — can sour the whole week and
-              quietly kill why you started playing. The game’s still great. The
-              organising isn’t.
+              One bad mix-in can put you off playing. One great one reminds you
+              why you love padel: the rallies, the laughs, the people.
+              Different levels, new faces, familiar rivals. When it&apos;s
+              organised well, everyone leaves wanting more.
             </p>
           </div>
           <div className="rounded-[28px] border border-[#0F1115]/15 bg-[#0F1115] p-6 text-white sm:p-7">
@@ -186,11 +186,11 @@ export default function HomePage() {
               THE FIX
             </p>
             <p className="land-display mt-3 text-xl font-bold tracking-[-0.02em] sm:text-2xl">
-              Get the love again.
+              Run the night properly.
             </p>
             <p className="mt-3 text-[14px] leading-relaxed text-[#B5B5B5]">
-              Interest, pay, check-in, and a track record organisers can trust —
-              so every mix-in feels like the game you fell for.
+              Interest, pay, check-in, and a track record organisers can trust,
+              so every mix-in feels fair, full, and worth showing up for.
             </p>
             <ul className="mt-5 grid grid-cols-2 gap-2 text-[12px] font-semibold text-[#C8FF2E] sm:text-[13px]">
               {["Show interest", "Pay to lock", "Check in", "Build record"].map(
@@ -208,7 +208,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Who — audience cards, no twin crown block */}
+      {/* Who, audience cards, no twin crown block */}
       <section className="border-b border-[#222] bg-[#0F1115] px-6 py-24 sm:px-10">
         <div className="mx-auto max-w-5xl">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -521,7 +521,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Download — one brand image fills the section */}
+      {/* Download, one brand image fills the section */}
       <section
         id="download"
         className="relative overflow-hidden bg-[#0F1115] px-6 py-28 sm:px-10"

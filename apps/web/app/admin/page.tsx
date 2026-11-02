@@ -29,8 +29,8 @@ export default async function AdminDashboardPage() {
               Back office
             </h1>
             <p className="mt-2 max-w-xl text-sm text-[#B5B5B5]">
-              Live operational numbers only. Empty or — means no real activity /
-              not connected — never placeholder data.
+              Live operational numbers only. Empty or - means no real activity /
+              not connected, never placeholder data.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -58,7 +58,7 @@ export default async function AdminDashboardPage() {
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Beta readiness</h2>
           <p className="mt-1 text-sm text-[#B5B5B5]">
-            Real users / App Store — do not invite friends until Twilio OTP is
+            Real users / App Store, do not invite friends until Twilio OTP is
             green and local phone fallback is off.
           </p>
           <ul className="mt-4 space-y-2">
@@ -170,8 +170,8 @@ export default async function AdminDashboardPage() {
 
         <h2 className="mt-12 text-lg font-semibold">PostHog · product</h2>
         <p className="mt-2 max-w-2xl text-sm text-[#B5B5B5]">
-          Last-7-day totals from PostHog Query API only. If a card shows —, the
-          personal API key is missing/invalid — not a fake zero.
+          Last-7-day totals from PostHog Query API only. If a card shows -, the
+          personal API key is missing/invalid, not a fake zero.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

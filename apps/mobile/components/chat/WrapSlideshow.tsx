@@ -279,7 +279,7 @@ export function WrapSlideshow({ slides, sessionTitle, onClose }: Props) {
   );
 }
 
-/** Static brand blocks + crown — no drifting blobs. */
+/** Static brand blocks + crown, no drifting blobs. */
 function BrandChrome({ lime }: { lime: boolean }) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -435,7 +435,7 @@ function SlideBody({
             style={[styles.quoteCard, { backgroundColor: panelBg, borderColor: panelBorder }]}
           >
             <Text style={[styles.quoteCardBody, { color: fg }]}>“{q.body}”</Text>
-            <Text style={[styles.quoteCardSender, { color: accent }]}>— {q.sender}</Text>
+            <Text style={[styles.quoteCardSender, { color: accent }]}>{q.sender}</Text>
           </View>
         ))}
       </View>
@@ -447,7 +447,7 @@ function SlideBody({
       <View style={styles.quoteSlide}>
         <Text style={[styles.kicker, { color: accent }]}>{slide.title}</Text>
         <Text style={[styles.quoteBody, { color: fg }]}>“{slide.body}”</Text>
-        <Text style={[styles.quoteSender, { color: accent }]}>— {slide.sender}</Text>
+        <Text style={[styles.quoteSender, { color: accent }]}>{slide.sender}</Text>
       </View>
     );
   }

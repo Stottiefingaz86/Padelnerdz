@@ -14,7 +14,7 @@ export async function isAdminAuthed(): Promise<boolean> {
 }
 
 export function sessionToken(): string {
-  // Lightweight gate for early back office — replace with real auth later.
+  // Lightweight gate for early back office, replace with real auth later.
   const secret = process.env.ADMIN_SESSION_SECRET ?? getAdminPassword();
   return Buffer.from(`pn:${secret}`).toString("base64url");
 }

@@ -38,7 +38,7 @@ function statusCopy(status: ConnectStatus) {
   if (status === 'pending') {
     return {
       title: 'Almost there',
-      body: 'Details submitted — verification usually finishes in a few minutes. Pull to refresh status.',
+      body: 'Details submitted, verification usually finishes in a few minutes. Pull to refresh status.',
       tone: 'warn' as const,
     };
   }
@@ -51,7 +51,7 @@ function statusCopy(status: ConnectStatus) {
   }
   return {
     title: 'One-time bank setup',
-    body: 'Takes about two minutes. After that, paid mix-ins split automatically — court to you, fee to Padel Nerdz.',
+    body: 'Takes about two minutes. After that, paid mix-ins split automatically, court to you, fee to Padel Nerdz.',
     tone: 'neutral' as const,
   };
 }
@@ -176,7 +176,7 @@ export default function GroupPaymentsScreen() {
         <Text style={styles.title}>Get paid for mix-ins</Text>
         <Text style={styles.lead}>
           Players pay once in the app. Your court share goes to your bank. We keep the platform fee
-          (+ IVA) — no honour system, no chasing.
+          (+ IVA), no honour system, no chasing.
         </Text>
 
         <View
@@ -241,7 +241,7 @@ export default function GroupPaymentsScreen() {
         <View style={styles.secureRow}>
           <Icon icon={Shield} color={colors.textMuted} size="sm" />
           <Text style={styles.secureText}>
-            Bank details are collected securely. Powered by Stripe — never shared in chat.
+            Bank details are collected securely. Powered by Stripe, never shared in chat.
           </Text>
         </View>
       </Screen>

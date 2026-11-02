@@ -69,7 +69,7 @@ export default function PayScreen() {
   async function onPay() {
     if (!id || !sessionId || !userId) return;
     if (!stripePay.supported) {
-      setError('Pay on the iOS or Android app — Stripe isn’t available in the browser.');
+      setError('Pay on the iOS or Android app, Stripe isn’t available in the browser.');
       return;
     }
     if (!stripeConfigured) {
@@ -138,7 +138,7 @@ export default function PayScreen() {
         mark: 'PN',
         tier: 'gold',
         title: 'You’re in',
-        body: 'Place confirmed — grab your ticket or add this to your calendar.',
+        body: 'Place confirmed, grab your ticket or add this to your calendar.',
       });
 
       const freshMissions = await syncAchievementsFromStats({ mixinsPlayed: 1 });
@@ -177,14 +177,14 @@ export default function PayScreen() {
           <Text style={styles.amountHint}>
             {stripePay.supported
               ? 'One total · card / Apple Pay / Google Pay'
-              : 'Browser preview — pay in the mobile app'}
+              : 'Browser preview, pay in the mobile app'}
           </Text>
         </View>
 
         <View style={styles.guide}>
           <Text style={styles.guideTitle}>How it works</Text>
           <Text style={styles.step}>
-            1. Tap <Text style={styles.em}>Pay {amount}</Text> — Stripe opens a secure sheet.
+            1. Tap <Text style={styles.em}>Pay {amount}</Text>, Stripe opens a secure sheet.
           </Text>
           <Text style={styles.step}>
             2. Pay with card, Apple Pay, or Google Pay (when enabled on your device).

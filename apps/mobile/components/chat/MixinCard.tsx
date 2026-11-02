@@ -13,7 +13,7 @@ type Props = {
   maxPlayers?: number;
   /** Court share only (organiser input) */
   priceCents?: number | null;
-  /** Platform fee before IVA — defaults to PLATFORM_FEE_CENTS (€1) */
+  /** Platform fee before IVA, defaults to PLATFORM_FEE_CENTS (€1) */
   commissionCents?: number | null;
   /** Prefer this when payload already has the player-facing total */
   playerTotalCents?: number | null;
@@ -90,7 +90,7 @@ export function MixinCard({
     primaryAction = onOpenSessionRoom;
     primaryDisabled = false;
   } else if (myState === 'awaiting_verify') {
-    primaryLabel = hasSessionRoom ? 'Open session chat' : 'Paid — waiting for organiser';
+    primaryLabel = hasSessionRoom ? 'Open session chat' : 'Paid, waiting for organiser';
     primaryAction = hasSessionRoom ? onOpenSessionRoom : () => {};
     primaryDisabled = !hasSessionRoom;
   } else if (organiserNeedsLineup) {

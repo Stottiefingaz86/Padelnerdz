@@ -18,7 +18,7 @@ type SlideTheme = {
 
 const STORIES: StoryId[] = ["cover", "time", "squad", "awards", "finale"];
 
-/** Demo night — 12 locked, full board. */
+/** Demo night, 12 locked, full board. */
 const SQUAD = [
   "Alex",
   "Mia",

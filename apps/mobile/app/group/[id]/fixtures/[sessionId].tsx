@@ -67,7 +67,7 @@ export default function FixturesScreen() {
         const g = await getGroup(id, userId, isGuest);
         setIsOrganiser(g ? canOrganiseGroup(g, userId) : false);
       }
-      // Never invent courts from “accepted” alone — paid players only
+      // Never invent courts from “accepted” alone, paid players only
       let fixtures = await getSessionFixtures(sessionId, isGuest);
       if (!fixtures) {
         fixtures = await ensureSessionFixtures({ sessionId, isGuest });
@@ -111,12 +111,12 @@ export default function FixturesScreen() {
     }
     if (scoreA === scoreB) {
       void warn();
-      setError('Scores can’t be tied — padel games need a winner');
+      setError('Scores can’t be tied, padel games need a winner');
       return;
     }
     if (round && isTournamentByWinsRound(round) && !isValidBestOfNine(scoreA, scoreB)) {
       void warn();
-      setError('Best of 9 — winner must have 5 games (e.g. 5–3 or 5–4)');
+      setError('Best of 9, winner must have 5 games (e.g. 5–3 or 5–4)');
       return;
     }
     void tap();
@@ -374,9 +374,9 @@ export default function FixturesScreen() {
                         {status === 'confirmed'
                           ? 'Confirmed'
                           : status === 'disputed'
-                            ? 'Disputed — re-enter score'
+                            ? 'Disputed, re-enter score'
                             : status === 'proposed'
-                              ? 'Proposed — needs confirm'
+                              ? 'Proposed, needs confirm'
                               : decided
                                 ? 'Score saved'
                                 : 'No score yet'}
@@ -407,7 +407,7 @@ export default function FixturesScreen() {
                 ) : null}
                 {isTournament && tournament?.phase === 'group' ? (
                   <Text style={styles.moveHint}>
-                    Both sides bank games won on the table — even a 5–4 loss is worth 4 points
+                    Both sides bank games won on the table, even a 5–4 loss is worth 4 points
                   </Text>
                 ) : null}
               </View>

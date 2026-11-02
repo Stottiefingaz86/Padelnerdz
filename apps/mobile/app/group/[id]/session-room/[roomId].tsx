@@ -887,7 +887,7 @@ export default function SessionRoomChatScreen() {
               {players.length === 0 ? (
                 <Text style={styles.sheetEmpty}>
                   {organiser
-                    ? 'No confirmed players yet — scan when they arrive.'
+                    ? 'No confirmed players yet, scan when they arrive.'
                     : 'Confirmed players appear after payment.'}
                 </Text>
               ) : (
@@ -965,7 +965,7 @@ export default function SessionRoomChatScreen() {
 
         {sessionClosed ? (
           <View style={[styles.closedBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            <Text style={styles.closedBarText}>Session closed — chat is read-only</Text>
+            <Text style={styles.closedBarText}>Session closed, chat is read-only</Text>
             {session ? (
               <Pressable
                 style={styles.closedWrapBtn}

@@ -13,14 +13,14 @@ type Props = {
   /** Chronological results: 1 = win, 0 = loss */
   series: number[];
   height?: number;
-  /** px per result — enables horizontal scroll when series is long */
+  /** px per result, enables horizontal scroll when series is long */
   pointWidth?: number;
   selectedIndex?: number | null;
   onSelectIndex?: (index: number) => void;
 };
 
 /**
- * Scrollable W/L form line — tap a point to inspect that result.
+ * Scrollable W/L form line, tap a point to inspect that result.
  */
 export function WinLossSparkline({
   series,

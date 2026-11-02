@@ -9,7 +9,7 @@ function tintFor(seed: string) {
   return TINTS[hash % TINTS.length];
 }
 
-/** Perfect circle initials avatar — never a squircle. */
+/** Perfect circle initials avatar, never a squircle. */
 export function Avatar({
   name,
   size = 48,

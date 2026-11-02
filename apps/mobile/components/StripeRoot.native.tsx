@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { stripePublishableKey } from '@/lib/payments';
 
-/** Native Stripe provider — not used on web (see StripeRoot.web.tsx). */
+/** Native Stripe provider, not used on web (see StripeRoot.web.tsx). */
 export function StripeRoot({ children }: { children: ReactNode }) {
   const publishableKey = stripePublishableKey();
   return (

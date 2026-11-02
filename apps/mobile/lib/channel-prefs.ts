@@ -5,7 +5,7 @@ export type MuteDuration = '8h' | '1w' | 'always';
 export type ChannelPrefs = {
   muted: boolean;
   sounds: boolean;
-  /** ISO timestamp — mute ends after this. null = muted until unmuted (always). */
+  /** ISO timestamp ,  mute ends after this. null = muted until unmuted (always). */
   muteUntil: string | null;
 };
 

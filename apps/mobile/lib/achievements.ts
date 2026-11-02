@@ -39,7 +39,7 @@ export type AchievementId =
   | 'host_5'
   | 'most_improved';
 
-/** @deprecated use AchievementId — kept for call-site compatibility */
+/** @deprecated use AchievementId ,  kept for call-site compatibility */
 export type AchievementSymbol = { ios: string; android: string; web: string };
 
 export type AchievementDef = {
@@ -51,7 +51,7 @@ export type AchievementDef = {
   tier: MissionTier;
   target: number;
   metric: MissionMetric;
-  /** Legacy symbol fields unused by MedalBadge — kept for older imports */
+  /** Legacy symbol fields unused by MedalBadge ,  kept for older imports */
   symbol?: AchievementSymbol;
 };
 
@@ -442,7 +442,7 @@ export async function fetchMissionStats(
   }
 }
 
-/** Evaluate catalog vs stats — returns defs that just unlocked. */
+/** Evaluate catalog vs stats ,  returns defs that just unlocked. */
 export async function syncAchievementsFromStats(input: {
   mixinsPlayed?: number;
   groupRank?: number | null;

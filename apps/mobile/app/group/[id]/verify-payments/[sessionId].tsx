@@ -7,7 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { tap } from '@/lib/feedback';
 
 /**
- * Honour / Bizum verify removed. Kept as a route so old deep links don’t crash —
+ * Honour / Bizum verify removed. Kept as a route so old deep links don’t crash , 
  * points organisers at Stripe auto-unlock.
  */
 export default function VerifyPaymentsScreen() {

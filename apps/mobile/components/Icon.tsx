@@ -2,7 +2,7 @@ import { colors } from '@padel-nerdz/config';
 import type { LucideIcon, LucideProps } from 'lucide-react-native';
 import { View, type ColorValue, type StyleProp, type ViewStyle } from 'react-native';
 
-/** Standard sizes — keep UI icons on this scale only. */
+/** Standard sizes ,  keep UI icons on this scale only. */
 export const iconSize = {
   sm: 18,
   md: 22,

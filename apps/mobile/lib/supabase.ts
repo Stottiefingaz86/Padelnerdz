@@ -19,7 +19,7 @@ export function getSupabase(): SupabaseClient<Database> {
   if (!client) {
     client = createClient<Database>(url, anonKey, {
       auth: {
-        // Prefer browser storage on web — AsyncStorage can stall boot in Expo web
+        // Prefer browser storage on web, AsyncStorage can stall boot in Expo web
         storage: Platform.OS === 'web' ? undefined : AsyncStorage,
         persistSession: true,
         autoRefreshToken: true,

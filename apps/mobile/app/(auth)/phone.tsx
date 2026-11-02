@@ -25,7 +25,7 @@ function isSmsUnsupported(message: string) {
   );
 }
 
-/** Device-only accounts without SMS — OFF for real beta / friends. */
+/** Device-only accounts without SMS, OFF for real beta / friends. */
 function allowLocalPhoneFallback() {
   return process.env.EXPO_PUBLIC_ALLOW_LOCAL_PHONE_FALLBACK === 'true';
 }
@@ -77,7 +77,7 @@ export default function PhoneScreen() {
       if (otpError) {
         if (isSmsUnsupported(otpError.message)) {
           if (allowLocalPhoneFallback()) {
-            // Solo device demo only — NOT for beta friends (no real auth / shared data)
+            // Solo device demo only, NOT for beta friends (no real auth / shared data)
             await finishLocalSignup(e164);
             return;
           }
@@ -118,7 +118,7 @@ export default function PhoneScreen() {
         error={error}
       />
       <Text style={styles.hint}>
-        Spain: keep +34 and type 612345678 — don’t add the country code again.
+        Spain: keep +34 and type 612345678, don’t add the country code again.
       </Text>
     </AuthShell>
   );

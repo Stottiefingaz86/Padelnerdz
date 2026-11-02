@@ -27,7 +27,7 @@ type Props = {
   createdAt: string;
 };
 
-/** Reliable local/remote media bubble — resolves private storage to signed URLs. */
+/** Reliable local/remote media bubble, resolves private storage to signed URLs. */
 export function MediaBubble({ uri, path, kind, sender, mine, createdAt }: Props) {
   const [displayUri, setDisplayUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,7 +77,7 @@ export function MediaBubble({ uri, path, kind, sender, mine, createdAt }: Props)
             disabled={kind === 'video'}
             style={styles.frame}
             accessibilityRole={kind === 'image' ? 'imagebutton' : 'image'}
-            accessibilityLabel={kind === 'video' ? 'Video' : 'Photo — tap to enlarge'}
+            accessibilityLabel={kind === 'video' ? 'Video' : 'Photo, tap to enlarge'}
           >
             <Image source={source} style={styles.image} resizeMode="cover" />
             {kind === 'video' ? (

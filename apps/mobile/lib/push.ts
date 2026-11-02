@@ -133,7 +133,7 @@ export async function scheduleMixinReminder(input: {
     identifier,
     content: {
       title: 'Mix-in in 1 hour',
-      body: `${input.title} starts soon — get ready.`,
+      body: `${input.title} starts soon ,  get ready.`,
       sound: true,
       data: {
         href: `/group/session/${input.sessionId}`,

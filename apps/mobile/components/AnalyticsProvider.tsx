@@ -13,7 +13,7 @@ function PostHogBinder({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!client) return;
     bindPostHogClient({
-      // PostHog JSON types are stricter than our Props bag — cast at the boundary.
+      // PostHog JSON types are stricter than our Props bag, cast at the boundary.
       capture: (event, properties) =>
         client.capture(event, properties as never),
       identify: (id, properties) =>
@@ -27,7 +27,7 @@ function PostHogBinder({ children }: { children: ReactNode }) {
 
 /**
  * Must sit inside Expo Router's NavigationContainer.
- * Screen autocapture uses useNavigation — keep it off at the root wrapper;
+ * Screen autocapture uses useNavigation, keep it off at the root wrapper;
  * we track product events explicitly via track().
  */
 export function AnalyticsProvider({ children }: { children: ReactNode }) {

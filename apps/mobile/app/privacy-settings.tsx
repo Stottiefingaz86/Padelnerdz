@@ -191,7 +191,7 @@ export default function PrivacySettingsScreen() {
           disabled={busy}
         >
           <Text style={styles.dangerTitle}>Delete account</Text>
-          <Text style={styles.rowMeta}>Permanent — cannot be undone</Text>
+          <Text style={styles.rowMeta}>Permanent, cannot be undone</Text>
         </Pressable>
 
         {busy ? (

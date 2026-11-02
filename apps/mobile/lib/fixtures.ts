@@ -154,7 +154,7 @@ export async function listCourtScoreMeta(
 }
 
 /**
- * Fixtures only exist after payments — built from paid players.
+ * Fixtures only exist after payments, built from paid players.
  */
 export async function ensureSessionFixtures(input: {
   sessionId: string;
@@ -303,7 +303,7 @@ export async function allCourtsConfirmed(
   if (isGuest || !isSupabaseConfigured || sessionId.startsWith('demo-')) return true;
   const meta = await listCourtScoreMeta(sessionId, round.round);
   if (meta.length === 0) {
-    // Legacy / first score without meta rows — treat scored as OK for beta
+    // Legacy / first score without meta rows, treat scored as OK for beta
     return true;
   }
   return round.matches.every((m) => {
@@ -318,7 +318,7 @@ export async function advanceToNextRound(input: {
   forceUnconfirmed?: boolean;
 }): Promise<{ round: SessionFixtureState | null; error?: string }> {
   const current = await getSessionFixtures(input.sessionId, input.isGuest);
-  if (!current) return { round: null, error: 'No fixtures yet — players must pay first' };
+  if (!current) return { round: null, error: 'No fixtures yet, players must pay first' };
 
   if (isTournamentByWinsRound(current)) {
     if (current.phase === 'complete') {

@@ -43,7 +43,7 @@ async function saveLedger(entries: PaymentLedgerEntry[]) {
   await AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(entries.slice(0, 500)));
 }
 
-/** Player tapped “I’ve paid” — honour claim only (not bank-verified). */
+/** Player tapped “I’ve paid” ,  honour claim only (not bank-verified). */
 export function recordPaymentClaim(input: {
   sessionId: string;
   groupId: string;
@@ -56,7 +56,7 @@ export function recordPaymentClaim(input: {
   });
 }
 
-/** Organiser confirmed money in Bizum/Revolut — counts as a real confirmed payment. */
+/** Organiser confirmed money in Bizum/Revolut ,  counts as a real confirmed payment. */
 export async function recordOwnerPayment(input: {
   sessionId: string;
   groupId: string;

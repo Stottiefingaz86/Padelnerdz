@@ -1,6 +1,6 @@
 /**
- * Owner back-office metrics — REAL data only.
- * Never invent sign-ups, payments, or volume. Missing config → "—" + explicit error.
+ * Owner back-office metrics, REAL data only.
+ * Never invent sign-ups, payments, or volume. Missing config → "-" + explicit error.
  */
 
 import { fetchPostHogProductStats } from "./posthog-stats";
@@ -43,12 +43,12 @@ const FEE_EUR = 1;
 const IVA_RATE = 0.21;
 
 function formatCount(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
+  if (n == null || Number.isNaN(n)) return "-";
   return new Intl.NumberFormat("en-GB").format(n);
 }
 
 function formatEur(amount: number | null): string {
-  if (amount == null) return "—";
+  if (amount == null) return "-";
   return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: "EUR",
@@ -142,7 +142,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
     twilioDetail =
       "TWILIO_VERIFY_READY=true · local phone fallback off · Supabase Phone + Twilio Verify";
   } else if (twilioOk) {
-    twilioDetail = `Live — ${phoneCount} profile(s) with phone · local fallback off · Twilio Verify via Supabase Auth`;
+    twilioDetail = `Live, ${phoneCount} profile(s) with phone · local fallback off · Twilio Verify via Supabase Auth`;
   } else if (localFallbackOn) {
     twilioDetail =
       "Local phone fallback is ON (EXPO_PUBLIC_ALLOW_LOCAL_PHONE_FALLBACK). Turn it off for beta friends and enable Twilio Verify in Supabase Auth → Phone.";
@@ -165,7 +165,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
   } else if (stripe.error && !stripe.accountId) {
     stripeDetail = stripe.error;
   } else if (!stripe.detailsSubmitted || !stripe.chargesEnabled) {
-    stripeDetail = `Keys wired (${stripe.mode}) on ${stripe.accountId ?? "account"} — open Stripe Dashboard → Connect / account onboarding and finish as an individual (name, ID, bank).`;
+    stripeDetail = `Live keys OK · ${stripe.accountId ?? "account"} · platform account still not charge-ready (Stripe reports details not submitted / charges off). Activate the platform in Dashboard → Settings → Business details, this is separate from organiser Express onboarding, and isn’t “pending review” until details are submitted.`;
   } else if (stripe.mode === "test") {
     stripeDetail = `Test Connect OK · ${stripe.accountId} · ${stripe.country?.toUpperCase() ?? "?"} · charges on. Still red until you switch Vercel to sk_live_ / pk_live_ keys for real payments.`;
   } else {
@@ -179,7 +179,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
       ok: supabaseReady && signups.ok,
       detail: supabaseReady
         ? signups.ok
-          ? "Live — asxqvytuzvnklptwoilj · eu-north-1"
+          ? "Live, asxqvytuzvnklptwoilj · eu-north-1"
           : signups.error
         : "Add SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (sb_secret_…) to apps/web/.env.local",
     },
@@ -190,7 +190,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
       detail: productLive
         ? "Live Query API"
         : posthog.error ??
-          "Rotate POSTHOG_PERSONAL_API_KEY (phx_) — current key rejected by API",
+          "Rotate POSTHOG_PERSONAL_API_KEY (phx_), current key rejected by API",
     },
     {
       id: "twilio",
@@ -272,7 +272,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
       {
         id: "stripe_mode",
         label: "Stripe mode",
-        value: stripe.configured ? stripe.mode : "—",
+        value: stripe.configured ? stripe.mode : "-",
         hint: stripe.accountId ?? undefined,
         accent: stripe.mode === "live",
       },
@@ -280,7 +280,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
         id: "stripe_charges",
         label: "Platform charges",
         value: !stripe.configured
-          ? "—"
+          ? "-"
           : stripe.chargesEnabled
             ? "Enabled"
             : "Blocked",
@@ -365,7 +365,7 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
       },
     ],
     note: businessLive
-      ? "Business numbers are live from Supabase. Zero means no activity yet — not placeholder data."
+      ? "Business numbers are live from Supabase. Zero means no activity yet, not placeholder data."
       : "Business metrics unavailable until SUPABASE_SERVICE_ROLE_KEY is set. No fabricated numbers will be shown.",
     posthogDashboardUrl: projectId
       ? `${posthogHost}/project/${projectId}`
@@ -379,5 +379,5 @@ export async function getAdminMetrics(): Promise<AdminMetricsSnapshot> {
 
 export const PRICING_COPY = {
   title: "Pricing rule · Stripe Connect",
-  body: "Organiser sets court price (e.g. €14). Player pays court + €1 + 21% IVA on the €1 in one total (e.g. €15.21) via Stripe PaymentSheet — even if court is free. Destination charge: organiser receives the court share on their Connect Express account; Mixy keeps fee+IVA as application_fee_amount automatically.",
+  body: "Organiser sets court price (e.g. €14). Player pays court + €1 + 21% IVA on the €1 in one total (e.g. €15.21) via Stripe PaymentSheet, even if court is free. Destination charge: organiser receives the court share on their Connect Express account; Mixy keeps fee+IVA as application_fee_amount automatically.",
 };

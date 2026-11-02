@@ -22,7 +22,7 @@ export type RacketRec = {
   priceHint?: string;
 };
 
-/** Own brand — Printful / warehouse later. Shown as real products, not “coming soon”. */
+/** Own brand, Printful / warehouse later. Shown as real products, not “coming soon”. */
 export const NERDZ_MERCH: MerchItem[] = [
   {
     id: 'tee-crown',
@@ -41,28 +41,28 @@ export const NERDZ_MERCH: MerchItem[] = [
   {
     id: 'cap-nerdz',
     name: 'Nerdz cap',
-    blurb: 'Low-profile — green mark, no clutter.',
+    blurb: 'Low-profile, green mark, no clutter.',
     priceLabel: '€28',
     kind: 'cap',
   },
   {
     id: 'sweatband-pair',
     name: 'Sweatbands',
-    blurb: 'Pair of wristbands — absorb the grind.',
+    blurb: 'Pair of wristbands, absorb the grind.',
     priceLabel: '€14',
     kind: 'sweatband',
   },
 ];
 
 /**
- * Recommended rackets — affiliate piece.
+ * Recommended rackets, affiliate piece.
  * Swap URLs when tracking links are live (`EXPO_PUBLIC_AFFILIATE_*`).
  */
 export const RACKET_RECS: RacketRec[] = [
   {
     id: 'bullpadel-vertex',
     name: 'Bullpadel Vertex',
-    blurb: 'Power shape for advanced / pro — our most-tapped ES pick.',
+    blurb: 'Power shape for advanced / pro, our most-tapped ES pick.',
     partner: 'Pádel Nuestro',
     url:
       process.env.EXPO_PUBLIC_AFFILIATE_PADEL_NUESTRO ??
@@ -72,7 +72,7 @@ export const RACKET_RECS: RacketRec[] = [
   {
     id: 'babolat-technical',
     name: 'Babolat Technical Viper',
-    blurb: 'Explosive attack pala — great if you live at the net.',
+    blurb: 'Explosive attack pala, great if you live at the net.',
     partner: 'Padel Market',
     url: process.env.EXPO_PUBLIC_AFFILIATE_PADEL_MARKET ?? 'https://padelmarket.com/',
     priceHint: 'From ~€220',

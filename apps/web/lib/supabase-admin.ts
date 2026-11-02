@@ -1,6 +1,6 @@
 /**
  * Server-only Supabase access for the owner back office.
- * Requires SUPABASE_SERVICE_ROLE_KEY — never expose this to the client.
+ * Requires SUPABASE_SERVICE_ROLE_KEY, never expose this to the client.
  */
 
 export function getSupabaseAdminConfig(): {

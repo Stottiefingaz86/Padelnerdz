@@ -50,7 +50,7 @@ function withStripeGradlePatch(config) {
       const gradlePath = findStripeGradle(cfg.modRequest.projectRoot);
       if (!gradlePath) {
         console.warn(
-          '[withStripeAndroidFix] stripe-react-native android/build.gradle not found — skip',
+          '[withStripeAndroidFix] stripe-react-native android/build.gradle not found, skip',
         );
         return cfg;
       }
@@ -90,7 +90,7 @@ function withStripeProguard(config) {
   ]);
 }
 
-/** R8 treats missing optional Stripe wallet classes as errors — allow the build. */
+/** R8 treats missing optional Stripe wallet classes as errors, allow the build. */
 function withStripeMissingClasses(config) {
   return withAppBuildGradle(config, (cfg) => {
     if (cfg.modResults.language !== 'groovy') return cfg;

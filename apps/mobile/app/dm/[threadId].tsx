@@ -102,7 +102,7 @@ export default function DirectMessageScreen() {
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              Say hi — suggest a 5‑minute hit to gauge level, or share court details.
+              Say hi, suggest a 5‑minute hit to gauge level, or share court details.
             </Text>
           }
           renderItem={({ item }) => (

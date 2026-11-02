@@ -125,7 +125,7 @@ export default function GroupChatScreen() {
         const session = await getSession(sessionId, isGuest);
         const regs = await listRegistrants(sessionId, id, isGuest);
         states[sessionId] = registrationStateForUser(regs, userId);
-        // payment_claimed still means lineup was set — don't flip the card back to "Confirm lineup"
+        // payment_claimed still means lineup was set ,  don't flip the card back to "Confirm lineup"
         confirmed[sessionId] = regs.some((r) =>
           r.status === 'selected' ||
           r.status === 'payment_claimed' ||
@@ -214,7 +214,7 @@ export default function GroupChatScreen() {
       return;
     }
     setBusySession(sessionId);
-    // Optimistic — organiser “I want to play” should feel instant.
+    // Optimistic ,  organiser “I want to play” should feel instant.
     setMyStates((prev) => ({ ...prev, [sessionId]: 'interested' }));
     setSessionMeta((prev) => {
       const cur = prev[sessionId];
@@ -239,14 +239,14 @@ export default function GroupChatScreen() {
       try {
         await refresh();
       } catch {
-        // Registration already succeeded — don’t show a false failure.
+        // Registration already succeeded ,  don’t show a false failure.
       }
     } catch (e) {
       setMyStates((prev) => ({ ...prev, [sessionId]: 'none' }));
       void warn();
       Alert.alert(
         'Couldn’t register',
-        e instanceof Error ? e.message : 'Try again — or tap “I want to play” in Admin.',
+        e instanceof Error ? e.message : 'Try again ,  or tap “I want to play” in Admin.',
       );
     } finally {
       setBusySession(null);

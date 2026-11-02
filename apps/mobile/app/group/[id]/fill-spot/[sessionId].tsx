@@ -18,7 +18,7 @@ import {
 } from '@/lib/sessions';
 
 /**
- * Organiser fills a spot after someone can’t make it — pick from waitlist / interest.
+ * Organiser fills a spot after someone can’t make it, pick from waitlist / interest.
  */
 export default function FillSpotScreen() {
   const { id, sessionId } = useLocalSearchParams<{ id: string; sessionId: string }>();
@@ -67,7 +67,7 @@ export default function FillSpotScreen() {
 
   const subtitle = useMemo(() => {
     if (openSpots <= 0) return 'Lineup looks full. If someone withdraws, come back here.';
-    return `${openSpots} open spot${openSpots === 1 ? '' : 's'}. Offer it to a waitlisted or interested player — they still need to pay.`;
+    return `${openSpots} open spot${openSpots === 1 ? '' : 's'}. Offer it to a waitlisted or interested player, they still need to pay.`;
   }, [openSpots]);
 
   async function confirmOffer() {
@@ -132,7 +132,7 @@ export default function FillSpotScreen() {
               <Text style={styles.heading}>{title}</Text>
               <Text style={styles.sub}>{subtitle}</Text>
               <Text style={styles.hint}>
-                No in-app refunds when someone pulls out — players settle money outside the app if
+                No in-app refunds when someone pulls out, players settle money outside the app if
                 needed.
               </Text>
             </View>

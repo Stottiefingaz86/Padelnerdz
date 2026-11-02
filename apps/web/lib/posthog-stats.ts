@@ -1,6 +1,6 @@
 /**
  * Live PostHog product stats for the admin back office.
- * Real Query API only — if the personal key fails, values stay null ("—").
+ * Real Query API only, if the personal key fails, values stay null ("-").
  * Never invent or freeze stale snapshot numbers.
  */
 

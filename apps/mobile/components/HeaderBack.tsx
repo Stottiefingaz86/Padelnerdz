@@ -13,7 +13,7 @@ type Props = {
 
 /**
  * Always-visible back control. Nested Expo stacks often mount with no history,
- * so the system back never appears — this always escapes.
+ * so the system back never appears, this always escapes.
  */
 export function HeaderBack({ fallbackHref }: Props) {
   const params = useLocalSearchParams<{ id?: string | string[] }>();

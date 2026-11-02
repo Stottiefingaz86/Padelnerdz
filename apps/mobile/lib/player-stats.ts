@@ -104,10 +104,10 @@ function suggestionFor(claimed: OrganiserLevel, performance: OrganiserLevel) {
     return `You set ${levelLabel(claimed)}, but results look closer to ${levelLabel(performance)}. Consider dropping a level.`;
   }
   if (gap === 1) {
-    return `Results lean ${levelLabel(performance)} vs your ${levelLabel(claimed)} claim — keep an eye on it.`;
+    return `Results lean ${levelLabel(performance)} vs your ${levelLabel(claimed)} claim, keep an eye on it.`;
   }
   if (gap <= -1) {
-    return `You're outperforming ${levelLabel(claimed)} — results look more like ${levelLabel(performance)}.`;
+    return `You're outperforming ${levelLabel(claimed)}, results look more like ${levelLabel(performance)}.`;
   }
   return `Your results match ${levelLabel(claimed)}. Nice calibration.`;
 }
@@ -157,7 +157,7 @@ function pack(input: {
     performanceLevel: resolvedPerf,
     suggestion:
       input.sessionsPlayed === 0 && !input.formOverride
-        ? 'Play a few mix-ins — we’ll compare your results to the level you claim.'
+        ? 'Play a few mix-ins, we’ll compare your results to the level you claim.'
         : suggestionFor(input.claimed, resolvedPerf),
     groupsCount: input.groupsCount,
     sessionsPlayed: input.sessionsPlayed || record.games,
@@ -198,7 +198,7 @@ export async function getOverallPlayerStats(
       }
     }
 
-    // Demo guest with no recorded mix-ins yet — show a filled career sample
+    // Demo guest with no recorded mix-ins yet, show a filled career sample
     if (sessionsPlayed === 0) {
       const wins = DEMO_FORM.filter((v) => v === 1).length;
       return pack({

@@ -39,7 +39,7 @@ type AuthState = {
   profile: Profile | null;
   configured: boolean;
   /**
-   * No Supabase session — local phone account or guest.
+   * No Supabase session, local phone account or guest.
    * Use this for the demo/local data plane (same as former isGuest checks).
    */
   offline: boolean;
@@ -50,10 +50,10 @@ type AuthState = {
     displayName: string,
     opts?: { complete?: boolean; avatarUrl?: string | null },
   ) => void;
-  /** Phone signup that works without SMS — persists on this device. */
+  /** Phone signup that works without SMS, persists on this device. */
   signUpWithPhoneLocal: (phoneE164: string) => Promise<Profile>;
   /**
-   * After verifyOtp — sync session into React state before navigating
+   * After verifyOtp, sync session into React state before navigating
    * (avoids index redirecting back to auth on a race).
    */
   adoptSupabaseSession: (session: Session) => Promise<Profile | null>;
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = useCallback(
     async (userId: string) => {
-      // Trigger creates the row on signup — brief retry if we race it
+      // Trigger creates the row on signup, brief retry if we race it
       let row = await fetchProfileRow(userId);
       if (!row) {
         await new Promise((r) => setTimeout(r, 400));

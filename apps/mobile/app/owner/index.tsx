@@ -7,7 +7,7 @@ const ADMIN_URL =
   process.env.EXPO_PUBLIC_ADMIN_URL ?? 'http://localhost:3000/admin';
 
 /**
- * Platform owner entry — metrics live on the web back office, not in the consumer app.
+ * Platform owner entry, metrics live on the web back office, not in the consumer app.
  */
 export default function OwnerDashboardScreen() {
   return (
@@ -18,7 +18,7 @@ export default function OwnerDashboardScreen() {
         <Text style={styles.title}>Metrics moved</Text>
         <Text style={styles.sub}>
           Sign-ups, commission (fee + IVA), and PostHog product analytics are on the admin back
-          office — not in the player app.
+          office, not in the player app.
         </Text>
         <Pressable
           style={styles.cta}

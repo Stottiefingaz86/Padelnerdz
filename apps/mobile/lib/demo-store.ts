@@ -19,7 +19,7 @@ export type MessageKind =
   | 'fixtures_card'
   | 'arrival_card';
 
-/** Demo fixture payload — Kings & Queens or Tournament by wins (json-shaped). */
+/** Demo fixture payload ,  Kings & Queens or Tournament by wins (json-shaped). */
 export type DemoFixtureRound = {
   round: number;
   matches: Array<{
@@ -147,7 +147,7 @@ let groups: DemoGroup[] = [
   {
     id: 'demo-public-2',
     name: 'La Reserva Beginners',
-    description: 'Friendly learning games — no pressure.',
+    description: 'Friendly learning games ,  no pressure.',
     visibility: 'public',
     location_label: 'La Reserva, Sotogrande',
     skill_level: 'beginner',
@@ -219,7 +219,7 @@ let groups: DemoGroup[] = [
   {
     id: 'demo-public-6',
     name: 'London Bridge Smash',
-    description: 'Indoor courts — after-work doubles.',
+    description: 'Indoor courts ,  after-work doubles.',
     visibility: 'public',
     location_label: 'London',
     skill_level: 'intermediate',
@@ -272,7 +272,7 @@ let groups: DemoGroup[] = [
   },
 ];
 
-/** Demo player's own skill — used to gate Discover joins. */
+/** Demo player's own skill ,  used to gate Discover joins. */
 let guestSkillLevel: OrganiserLevel = 'intermediate';
 let guestAvatarUrl: string | null = null;
 
@@ -355,7 +355,7 @@ function seedPublicGroupMembers(groupId: string) {
         display_name: 'Maya Ortiz',
         role: 'owner',
         organiser_level: 'advanced',
-        notes: 'Founder — runs Thursday nights',
+        notes: 'Founder ,  runs Thursday nights',
         sessions_played: 42,
         no_shows: 1,
         best_finish: 1,
@@ -715,7 +715,7 @@ export function markDemoCheckIn(input: {
   );
 }
 
-/** Mark a confirmed session player as no-show — bumps no_shows + hurts reliability. */
+/** Mark a confirmed session player as no-show ,  bumps no_shows + hurts reliability. */
 export function markDemoNoShow(input: {
   sessionId: string;
   groupId: string;
@@ -964,7 +964,7 @@ export function createDemoSession(input: {
       courts: session.courts,
       price_cents: session.price_cents,
       commission_cents: session.commission_cents,
-      // Court + €1 fee + IVA on fee — single player-facing total
+      // Court + €1 fee + IVA on fee ,  single player-facing total
       player_total_cents:
         (session.price_cents ?? 0) +
         session.commission_cents +
@@ -1048,7 +1048,7 @@ export function selectDemoPlayers(input: {
   const selected = listDemoRegistrations(input.sessionId).filter((r) => r.status === 'selected');
   const selectedNames = selected.map((r) => r.display_name);
 
-  // Lineup confirmed — payment + chatter stay in session flow, not main chat spam
+  // Lineup confirmed ,  payment + chatter stay in session flow, not main chat spam
   sessions = sessions.map((s) =>
     s.id === input.sessionId
       ? { ...s, status: 'selected', session_room_id: s.session_room_id }
@@ -1072,7 +1072,7 @@ export function selectDemoPlayers(input: {
     },
   });
 
-  // Fixtures wait until players pay — never generate on accept alone
+  // Fixtures wait until players pay ,  never generate on accept alone
   fixturesBySession.delete(input.sessionId);
 
   emit();
@@ -1140,7 +1140,7 @@ export function claimDemoPayment(input: {
     sender_id: null,
     sender_name: 'Padel Nerdz',
     kind: 'system',
-    body: `${input.displayName} says they paid for ${session.title} — check Bizum/Revolut, then confirm in Verify payments.`,
+    body: `${input.displayName} says they paid for ${session.title} ,  check Bizum/Revolut, then confirm in Verify payments.`,
     payload: {
       event: 'payment_claimed',
       session_id: input.sessionId,
@@ -1223,7 +1223,7 @@ export function verifyDemoPayment(input: {
     sender_id: null,
     sender_name: 'Padel Nerdz',
     kind: 'system',
-    body: `${input.displayName} — payment verified by organiser.`,
+    body: `${input.displayName} ,  payment verified by organiser.`,
   });
 
   const fixtures = maybeGenerateDemoFixturesAfterPayment(input.sessionId);
@@ -1344,7 +1344,7 @@ export function closeDemoSession(input: {
       sender_id: null,
       sender_name: 'Padel Nerdz',
       kind: 'system',
-      body: 'Session closed — this chat is now read-only.',
+      body: 'Session closed ,  this chat is now read-only.',
     });
   }
 
@@ -1360,7 +1360,7 @@ export function listDemoPaidPlayers(sessionId: string): DemoRegistration[] {
 }
 
 /**
- * Player can’t make it (voluntary). No in-app refund — organiser can refill from waitlist.
+ * Player can’t make it (voluntary). No in-app refund ,  organiser can refill from waitlist.
  * Paid players keep financial settlement outside the app.
  */
 export function withdrawDemoRegistration(input: {
@@ -1412,7 +1412,7 @@ export function withdrawDemoRegistration(input: {
     sender_id: null,
     sender_name: 'Padel Nerdz',
     kind: 'system',
-    body: `${input.displayName} can’t make it${reasonBit} — spot open.${moneyBit}`,
+    body: `${input.displayName} can’t make it${reasonBit} ,  spot open.${moneyBit}`,
     payload: {
       event: 'player_withdrew',
       session_id: input.sessionId,
@@ -1457,7 +1457,7 @@ export function offerDemoSpot(input: {
       r.status === 'paid' || r.status === 'selected' || r.status === 'payment_claimed',
   ).length;
   if (session && paidOrSelected >= session.max_players) {
-    throw new Error('Lineup is full — withdraw someone first');
+    throw new Error('Lineup is full ,  withdraw someone first');
   }
 
   registrations = registrations.map((r) => {
@@ -1509,7 +1509,7 @@ export function postDemoNeedPlayer(input: {
     sender_id: null,
     sender_name: 'Padel Nerdz',
     kind: 'system',
-    body: `Need ${spots} more player${spots === 1 ? '' : 's'} for ${session?.title ?? 'the mix-in'} — register interest or message the organiser.`,
+    body: `Need ${spots} more player${spots === 1 ? '' : 's'} for ${session?.title ?? 'the mix-in'} ,  register interest or message the organiser.`,
     payload: {
       event: 'need_player',
       session_id: input.sessionId,

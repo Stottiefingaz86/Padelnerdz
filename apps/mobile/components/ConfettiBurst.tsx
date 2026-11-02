@@ -86,7 +86,7 @@ function ConfettiPiece({ piece }: { piece: Piece }) {
   );
 }
 
-/** Full-viewport confetti burst — intended to sit above celebration UI. */
+/** Full-viewport confetti burst, intended to sit above celebration UI. */
 export function ConfettiBurst({ count = 120 }: { count?: number }) {
   const pieces = useMemo<Piece[]>(
     () =>

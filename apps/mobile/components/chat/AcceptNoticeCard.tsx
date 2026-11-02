@@ -6,7 +6,7 @@ type Props = {
   players: string[];
 };
 
-/** Bot card when organiser confirms lineup — lists who must pay next. */
+/** Bot card when organiser confirms lineup, lists who must pay next. */
 export function AcceptNoticeCard({ title, players }: Props) {
   return (
     <View style={styles.wrap}>
@@ -19,7 +19,7 @@ export function AcceptNoticeCard({ title, players }: Props) {
         </View>
         <Text style={styles.kicker}>LINEUP SET</Text>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.sub}>Selected players — pay to confirm. Courts unlock after payment.</Text>
+        <Text style={styles.sub}>Selected players, pay to confirm. Courts unlock after payment.</Text>
         <View style={styles.list}>
           {players.map((name, i) => (
             <View key={`${name}-${i}`} style={styles.row}>

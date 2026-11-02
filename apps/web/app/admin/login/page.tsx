@@ -20,7 +20,7 @@ export default async function AdminLoginPage() {
           Back office
         </h1>
         <p className="mt-2 text-sm text-[#7A7A7A]">
-          Metrics and product analytics — not part of the consumer app.
+          Metrics and product analytics, not part of the consumer app.
         </p>
         <LoginForm />
       </div>

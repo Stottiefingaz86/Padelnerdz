@@ -3,7 +3,7 @@ import { ImageBackground, StyleSheet } from 'react-native';
 
 type Props = {
   children: ReactNode;
-  /** Pattern fade — keep low so bubbles stay readable. */
+  /** Pattern fade, keep low so bubbles stay readable. */
   opacity?: number;
 };
 

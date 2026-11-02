@@ -16,7 +16,7 @@ type Props = {
 export function BrandWallpaper({
   opacity = 0.7,
   parallax = false,
-  /** CSS length for one tile width — height follows aspect */
+  /** CSS length for one tile width, height follows aspect */
   tile = "360px",
 }: {
   opacity?: number;
@@ -105,7 +105,7 @@ export function BrandSection({
   );
 }
 
-/** Crown highlight band — solid ink, no wallpaper. */
+/** Crown highlight band, solid ink, no wallpaper. */
 export function PatternBand({ title, body }: Props) {
   return (
     <section className="border-y border-[#222] bg-[#0F1115]">

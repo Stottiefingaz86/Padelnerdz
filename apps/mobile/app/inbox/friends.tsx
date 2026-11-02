@@ -33,7 +33,7 @@ import {
 } from '@/lib/friends';
 import { useGlassHeaderOffset } from '@/lib/layout';
 
-/** Friends, requests, QR — secondary to the Instagram-style Messages list. */
+/** Friends, requests, QR, secondary to the Instagram-style Messages list. */
 export default function InboxFriendsScreen() {
   const insets = useSafeAreaInsets();
   const headerOffset = useGlassHeaderOffset();

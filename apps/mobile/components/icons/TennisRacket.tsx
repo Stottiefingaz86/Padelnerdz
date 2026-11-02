@@ -1,7 +1,7 @@
 import { createLucideIcon } from 'lucide-react-native';
 
 /**
- * Lucide Lab `tennis-racket` — not in core lucide-react-native yet.
+ * Lucide Lab `tennis-racket`, not in core lucide-react-native yet.
  * Same stroke language as other Lucide icons; use via `<Icon icon={TennisRacket} />`.
  * @see https://lucide.dev/icons/lab/tennis-racket
  */

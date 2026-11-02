@@ -261,7 +261,7 @@ async function assertSessionRoomAcceptsMessages(
     const { getDemoSessionByRoomId } = await import('./demo-store');
     const hit = getDemoSessionByRoomId(roomId);
     if (hit?.status === 'closed') {
-      throw new Error('This session is closed — chat is read-only.');
+      throw new Error('This session is closed, chat is read-only.');
     }
     return;
   }
@@ -273,7 +273,7 @@ async function assertSessionRoomAcceptsMessages(
     .maybeSingle();
   const status = (room?.sessions as { status?: string } | null)?.status;
   if (status === 'closed') {
-    throw new Error('This session is closed — chat is read-only.');
+    throw new Error('This session is closed, chat is read-only.');
   }
 }
 

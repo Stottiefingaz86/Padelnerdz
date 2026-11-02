@@ -48,7 +48,7 @@ function formatThreadTime(iso: string) {
 }
 
 /**
- * Instagram-style Messages inbox — thread list first, friends/QR live under People.
+ * Instagram-style Messages inbox, thread list first, friends/QR live under People.
  */
 export default function InboxTabScreen() {
   const insets = useSafeAreaInsets();
@@ -202,7 +202,7 @@ export default function InboxTabScreen() {
               </View>
               <Text style={styles.emptyTitle}>Your messages</Text>
               <Text style={styles.emptyBody}>
-                Send a message to a friend or organiser — chats show up here like Instagram DMs.
+                Send a message to a friend or organiser, chats show up here like Instagram DMs.
               </Text>
               <Pressable
                 style={styles.emptyCta}

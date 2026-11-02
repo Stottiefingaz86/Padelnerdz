@@ -37,7 +37,7 @@ export default function PrivacyPage() {
               <li>Payment confirmation status when you mark a session as paid (we do not process card payments in the current version)</li>
               <li>
                 Product analytics events (e.g. sign-up, join group, payment confirmed)
-                via PostHog, when enabled — used to improve the product
+                via PostHog, when enabled, used to improve the product
               </li>
             </ul>
           </section>

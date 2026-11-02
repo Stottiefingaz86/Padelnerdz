@@ -79,7 +79,7 @@ function RootNavigator() {
     void getBiometricKind().then((kind) => setLockLabel(biometricLabel(kind)));
   }, []);
 
-  // Resolve whether lock is on — do NOT prompt Face ID here (window may not be ready).
+  // Resolve whether lock is on, do NOT prompt Face ID here (window may not be ready).
   useEffect(() => {
     if (!ready || !fontsReady || Platform.OS === 'web') return;
     void SplashScreen.hideAsync();
@@ -329,7 +329,7 @@ function RootNavigator() {
 export default function RootLayout() {
   // ThemeProvider/Stack establish navigation context before PostHog mounts.
   // PostHog must not wrap above NavigationContainer (useNavigation crash on web).
-  // StripeRoot is a no-op on web — native Stripe SDK breaks Metro web bundles.
+  // StripeRoot is a no-op on web, native Stripe SDK breaks Metro web bundles.
   return (
     <AuthProvider>
       <StripeRoot>

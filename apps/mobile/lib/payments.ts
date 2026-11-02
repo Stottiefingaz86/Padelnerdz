@@ -120,7 +120,7 @@ async function invokeAuthed<T>(
       data && typeof data === 'object' && 'error' in data
         ? String((data as { error?: unknown }).error ?? '')
         : undefined;
-    // FunctionsHttpError often leaves `data` null — read the Response body.
+    // FunctionsHttpError often leaves `data` null, read the Response body.
     if (!fromBody && error && typeof error === 'object' && 'context' in error) {
       try {
         const ctx = (error as { context?: Response }).context;
@@ -164,7 +164,7 @@ export async function startStripeConnectOnboarding(input: {
   });
 }
 
-/** HTTPS URL Stripe redirects to after Connect — must match edge-function return_url. */
+/** HTTPS URL Stripe redirects to after Connect, must match edge-function return_url. */
 export function connectReturnUrl(groupId: string, stripe: 'return' | 'refresh' = 'return') {
   const site = process.env.EXPO_PUBLIC_SITE_URL?.replace(/\/$/, '');
   // Prefer marketing site when configured (never app schemes).
@@ -218,7 +218,7 @@ export async function createStripePaymentIntent(input: {
   applicationFeeCents: number;
 }> {
   if (input.isGuest || !isSupabaseConfigured || input.sessionId.startsWith('demo-')) {
-    throw new Error('Card payments need a live session — leave demo / guest mode.');
+    throw new Error('Card payments need a live session, leave demo / guest mode.');
   }
   return invokeAuthed('stripe-create-payment-intent', {
     sessionId: input.sessionId,

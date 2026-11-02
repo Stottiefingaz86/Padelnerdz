@@ -1,6 +1,6 @@
 /**
  * Server-only Stripe reads for the owner back office.
- * Uses STRIPE_SECRET_KEY — never expose to the client.
+ * Uses STRIPE_SECRET_KEY, never expose to the client.
  */
 
 export type StripePlatformStatus = {

@@ -15,7 +15,7 @@ type Props = {
   title: string;
   body: string;
   actions?: Action[];
-  /** Full-bleed photo — use brand / court stills from assets/images/empty/ */
+  /** Full-bleed photo, use brand / court stills from assets/images/empty/ */
   image?: ImageSourcePropType;
   /** cover crops; contain shows full artwork */
   imageFit?: 'cover' | 'contain';

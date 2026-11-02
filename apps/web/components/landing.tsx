@@ -35,7 +35,7 @@ export function AppStoreBadge({ className = "" }: { className?: string }) {
   );
 }
 
-/** Official-style black Google Play badge — downloads the Android preview APK. */
+/** Official-style black Google Play badge, downloads the Android preview APK. */
 export function GooglePlayBadge({ className = "" }: { className?: string }) {
   return (
     <a

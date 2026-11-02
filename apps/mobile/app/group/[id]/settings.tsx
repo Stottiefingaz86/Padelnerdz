@@ -151,7 +151,7 @@ export default function GroupSettingsScreen() {
             allowAll
             onChange={setLevelChoice}
             label="Who can join"
-            help="All levels, one level, or a band — e.g. Beginner through Intermediate."
+            help="All levels, one level, or a band, e.g. Beginner through Intermediate."
           />
         ) : null}
 
@@ -174,7 +174,7 @@ export default function GroupSettingsScreen() {
           }}
         >
           <Text style={styles.toggleTitle}>Admins only</Text>
-          <Text style={styles.toggleMeta}>Only organisers post — members read</Text>
+          <Text style={styles.toggleMeta}>Only organisers post, members read</Text>
         </Pressable>
 
         <AppButton label="Save settings" onPress={onSave} loading={loading} />

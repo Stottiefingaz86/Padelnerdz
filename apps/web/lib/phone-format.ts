@@ -40,11 +40,11 @@ export type FormattedPhone = {
 
 export function formatPhoneWithCountry(raw: string | null | undefined): FormattedPhone {
   if (!raw?.trim()) {
-    return { display: "—", countryLabel: "—", e164: "" };
+    return { display: "-", countryLabel: "-", e164: "" };
   }
   const digits = raw.replace(/\D/g, "");
   if (!digits) {
-    return { display: raw.trim(), countryLabel: "—", e164: raw.trim() };
+    return { display: raw.trim(), countryLabel: "-", e164: raw.trim() };
   }
 
   const match = DIAL_CODES.find((c) => digits.startsWith(c.code));

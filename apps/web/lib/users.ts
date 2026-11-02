@@ -1,5 +1,5 @@
 /**
- * Users for the admin back office — live Supabase profiles only.
+ * Users for the admin back office, live Supabase profiles only.
  * Never invent names or phone numbers.
  */
 
@@ -26,7 +26,7 @@ export async function getAdminUsers(): Promise<{
   if (!getSupabaseAdminConfig()) {
     return {
       users: [],
-      note: "No users shown. Add SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to apps/web/.env.local — fabricated user lists are not allowed.",
+      note: "No users shown. Add SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to apps/web/.env.local, fabricated user lists are not allowed.",
       error: "SUPABASE_SERVICE_ROLE_KEY not set",
     };
   }
@@ -62,14 +62,14 @@ export async function getAdminUsers(): Promise<{
         avatarUrl: r.avatar_url?.trim() || null,
         phoneE164: phone.e164 || r.phone_e164?.trim() || "",
         phoneDisplay: r.phone_e164?.trim() ? phone.display : "(no phone on profile)",
-        countryLabel: r.phone_e164?.trim() ? phone.countryLabel : "—",
+        countryLabel: r.phone_e164?.trim() ? phone.countryLabel : "-",
         createdAt: r.created_at,
         source: "live" as const,
       };
     }),
     note:
       result.data.length === 0
-        ? "Live query OK — zero profiles yet. Real beta signups will appear here after Twilio OTP + onboarding."
+        ? "Live query OK, zero profiles yet. Real beta signups will appear here after Twilio OTP + onboarding."
         : `Live from Supabase · ${result.data.length} profile(s).`,
   };
 }

@@ -47,7 +47,7 @@ export function ConnectReturnClient({ groupId, stripe }: Props) {
             ? tried
               ? 'Opening Mixy… If nothing happens, tap below.'
               : 'Returning you to unlock mix-in payouts…'
-            : 'Missing group — open Payouts from Admin in the app.'}
+            : 'Missing group, open Payouts from Admin in the app.'}
         </p>
 
         {deepLink ? (

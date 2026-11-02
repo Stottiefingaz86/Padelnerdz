@@ -25,7 +25,7 @@ type Props = {
   label?: string;
   help?: string;
   required?: boolean;
-  /** Single claimed level (profile) — still uses range UI with min=max */
+  /** Single claimed level (profile), still uses range UI with min=max */
   single?: boolean;
   /** Show an All levels chip (public / approval groups) */
   allowAll?: boolean;
@@ -48,7 +48,7 @@ export function LevelRangePicker({
   value,
   onChange,
   label = 'Group levels',
-  help = 'Tap two ends to set a band — e.g. Beginner through Intermediate.',
+  help = 'Tap two ends to set a band, e.g. Beginner through Intermediate.',
   required,
   single,
   allowAll,

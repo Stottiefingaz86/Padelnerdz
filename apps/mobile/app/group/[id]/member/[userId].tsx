@@ -324,11 +324,11 @@ export default function MemberAdminScreen() {
           <View style={styles.dmHint}>
             <Text style={styles.dmHintText}>
               {followState === 'friends'
-                ? 'You’re connected — message opens in Inbox.'
+                ? 'You’re connected, message opens in Inbox.'
                 : followState === 'outgoing'
                   ? 'Follow sent. Messaging unlocks when they approve.'
                   : followState === 'incoming'
-                    ? 'They asked to follow you — approve to unlock messaging.'
+                    ? 'They asked to follow you, approve to unlock messaging.'
                     : 'Follow them first. After they approve, you can message.'}
             </Text>
           </View>
@@ -345,7 +345,7 @@ export default function MemberAdminScreen() {
           </View>
           <View style={styles.stat}>
             <Text style={styles.statValue}>
-              {member.best_finish != null ? `#${member.best_finish}` : '—'}
+              {member.best_finish != null ? `#${member.best_finish}` : '-'}
             </Text>
             <Text style={styles.statLabel}>Best finish</Text>
           </View>
@@ -358,7 +358,7 @@ export default function MemberAdminScreen() {
           </View>
           <View style={styles.stat}>
             <Text style={styles.statValue}>
-              {member.reliability == null ? '—' : `${member.reliability}%`}
+              {member.reliability == null ? '-' : `${member.reliability}%`}
             </Text>
             <Text style={styles.statLabel}>Reliability</Text>
           </View>

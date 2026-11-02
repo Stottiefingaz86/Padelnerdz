@@ -8,7 +8,7 @@ type Props = {
 };
 
 /**
- * Session-room guide — what to do at the courts (check-in QR / organiser mark).
+ * Session-room guide, what to do at the courts (check-in QR / organiser mark).
  */
 export function ArrivalGuideCard({ venue, onOpenTicket, organiserView }: Props) {
   return (
@@ -35,7 +35,7 @@ export function ArrivalGuideCard({ venue, onOpenTicket, organiserView }: Props) 
           {(organiserView
             ? [
                 'Open Scan check-in (or tap a player)',
-                'Scan their QR — or Mark arrived / Didn’t show',
+                'Scan their QR, or Mark arrived / Didn’t show',
                 'Then start fixtures when the lineup is in',
               ]
             : [

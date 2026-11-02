@@ -225,7 +225,7 @@ export function KqDemo() {
       return;
     }
     if (scoreA === scoreB) {
-      setErrors((prev) => ({ ...prev, [court]: "Need a winner — scores can’t be tied" }));
+      setErrors((prev) => ({ ...prev, [court]: "Need a winner, scores can’t be tied" }));
       return;
     }
 
@@ -319,7 +319,7 @@ export function KqDemo() {
               You’re running the board.
             </h3>
             <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-[#B5B5B5]">
-              Type each pair’s games after ~{MATCH_MINUTES} minutes — 15–0, 6–4,
+              Type each pair’s games after ~{MATCH_MINUTES} minutes, 15–0, 6–4,
               whatever happened. Save every court, then rebuild fixtures. After{" "}
               {TOTAL_ROUNDS} rounds / {SESSION_HOURS} hours, Kings & Queens
               winners take the night.
@@ -507,7 +507,7 @@ export function KqDemo() {
                     <p className="text-[12px] font-medium text-[#FF6B6B]">{err}</p>
                   ) : (
                     <p className="text-[11px] text-[#7A7A7A]">
-                      Score sits next to each pair — type games won after ~
+                      Score sits next to each pair, type games won after ~
                       {MATCH_MINUTES} min.
                     </p>
                   )}

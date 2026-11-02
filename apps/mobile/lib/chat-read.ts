@@ -50,7 +50,7 @@ export async function unreadCountForGroup(
   const lastRead = cache[groupId];
   const msgs = listDemoMessages(groupId);
   if (!lastRead) {
-    // Never opened — count others' messages (cap so first join isn’t insane)
+    // Never opened, count others' messages (cap so first join isn’t insane)
     return Math.min(
       99,
       msgs.filter((m) => m.sender_id && m.sender_id !== userId).length,
@@ -95,7 +95,7 @@ export async function totalUnreadForGroups(
   return total;
 }
 
-/** Active chat — suppress toast while viewing */
+/** Active chat, suppress toast while viewing */
 let activeChannelId: string | null = null;
 
 export function setActiveChannel(channelId: string | null) {

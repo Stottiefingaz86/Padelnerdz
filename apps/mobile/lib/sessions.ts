@@ -180,7 +180,7 @@ export async function getSession(
   const sid = Array.isArray(sessionId) ? sessionId[0] : sessionId;
   if (!sid) return null;
 
-  // Demo / offline first — also fallback if a live client still has demo-* ids.
+  // Demo / offline first, also fallback if a live client still has demo-* ids.
   if (isGuest || !isSupabaseConfigured || sid.startsWith('demo-')) {
     const s = getDemoSession(sid);
     return s ? fromDemo(s) : null;
@@ -203,7 +203,7 @@ export async function getSession(
 
   const room = data.session_rooms as unknown as { id: string } | { id: string }[] | null;
   let roomId = Array.isArray(room) ? room[0]?.id ?? null : room?.id ?? null;
-  // Embed can miss when RLS was tight — fetch room directly for paid/organiser access.
+  // Embed can miss when RLS was tight, fetch room directly for paid/organiser access.
   if (!roomId) {
     const { data: roomRow } = await getSupabaseLoose()
       .from('session_rooms')
@@ -311,7 +311,7 @@ export async function createMixIn(input: {
 
   if (error) throw error;
 
-  // Organiser is interested by default — they can still confirm lineup from Admin.
+  // Organiser is interested by default, they can still confirm lineup from Admin.
   try {
     await registerForSession({
       sessionId: session.id,
@@ -360,7 +360,7 @@ export async function createMixIn(input: {
       courts: session.courts,
       price_cents: session.price_cents,
       commission_cents: session.commission_cents ?? PLATFORM_FEE_CENTS,
-      /** Player-facing total (court + fee + IVA) — what the card must show */
+      /** Player-facing total (court + fee + IVA), what the card must show */
       player_total_cents: playerTotal,
     },
   });
@@ -423,13 +423,13 @@ export async function registerForSession(input: {
     throw new Error('Sign in again, then register interest.');
   }
 
-  // Prefer SECURITY DEFINER RPC — creator/organiser can always self-register to play.
+  // Prefer SECURITY DEFINER RPC, creator/organiser can always self-register to play.
   const { error: rpcError } = await getSupabaseLoose().rpc('register_interest_in_session', {
     p_session_id: input.sessionId,
   });
 
   if (!rpcError) {
-    // Verify row exists — some clients get empty errors with success=false.
+    // Verify row exists, some clients get empty errors with success=false.
     if (await confirmOwnRegistration(input.sessionId, input.userId)) {
       await scheduleReminderForSession(input.sessionId);
       return;
@@ -437,7 +437,7 @@ export async function registerForSession(input: {
   }
 
   const rpcMsg = rpcError
-    ? [rpcError.message, rpcError.details, rpcError.hint].filter(Boolean).join(' — ')
+    ? [rpcError.message, rpcError.details, rpcError.hint].filter(Boolean).join(', ')
     : '';
 
   // Already interested (or non-cancelled) counts as success
@@ -483,7 +483,7 @@ export async function registerForSession(input: {
       return;
     }
 
-    const msg = [error.message, error.details, error.hint].filter(Boolean).join(' — ');
+    const msg = [error.message, error.details, error.hint].filter(Boolean).join(', ');
     if (/already|duplicate|unique/i.test(msg)) {
       await scheduleReminderForSession(input.sessionId);
       return;
@@ -518,7 +518,7 @@ export async function listRegistrants(
     return source.map(fromDemoReg);
   }
 
-  // Loose client + no embeds — joins were wiping the Admin interest list.
+  // Loose client + no embeds, joins were wiping the Admin interest list.
   // Prefer checked_in_at; fall back if migration not applied yet.
   let data: unknown[] | null = null;
   {
@@ -660,7 +660,7 @@ export async function withdrawFromSession(input: {
     displayName: 'Padel Nerdz',
     isGuest: false,
     kind: 'system',
-    body: `${input.displayName} can’t make it${reasonBit} — spot open.${moneyBit}`,
+    body: `${input.displayName} can’t make it${reasonBit}, spot open.${moneyBit}`,
     payload: {
       event: 'player_withdrew',
       session_id: input.sessionId,
@@ -700,7 +700,7 @@ export async function offerSessionSpot(input: {
   const session = await getSession(input.sessionId, false);
   const filled = regs.filter((r) => r.status === 'paid' || r.status === 'selected').length;
   if (session && filled >= session.max_players) {
-    throw new Error('Lineup is full — withdraw someone first');
+    throw new Error('Lineup is full, withdraw someone first');
   }
 
   if (row) {
@@ -765,7 +765,7 @@ export async function postNeedPlayer(input: {
     displayName: 'Padel Nerdz',
     isGuest: false,
     kind: 'system',
-    body: `Need ${spots} more player${spots === 1 ? '' : 's'} for ${session?.title ?? 'the mix-in'} — register interest or message the organiser.`,
+    body: `Need ${spots} more player${spots === 1 ? '' : 's'} for ${session?.title ?? 'the mix-in'}, register interest or message the organiser.`,
     payload: {
       event: 'need_player',
       session_id: input.sessionId,
@@ -809,7 +809,7 @@ export async function selectPlayersForSession(input: {
 
   const session = await getSession(input.sessionId, false);
 
-  // Main chat: short accept notice only — no payment spam
+  // Main chat: short accept notice only, no payment spam
   await sendGroupMessage({
     groupId: input.groupId,
     userId: input.organiserId,
@@ -830,7 +830,7 @@ export async function selectPlayersForSession(input: {
 }
 
 /**
- * @deprecated Honour-claim removed — places unlock only via Stripe PaymentSheet + webhook.
+ * @deprecated Honour-claim removed, places unlock only via Stripe PaymentSheet + webhook.
  */
 export async function claimSessionPayment(_input: {
   sessionId: string;
@@ -839,10 +839,10 @@ export async function claimSessionPayment(_input: {
   displayName: string;
   isGuest: boolean;
 }): Promise<{ sessionRoomId: string | null }> {
-  throw new Error('Pay in-app with Stripe — honour claims are disabled.');
+  throw new Error('Pay in-app with Stripe, honour claims are disabled.');
 }
 
-/** @deprecated Honour reject removed — Stripe is the only pay path. */
+/** @deprecated Honour reject removed, Stripe is the only pay path. */
 export async function rejectPaymentClaim(_input: {
   sessionId: string;
   groupId: string;
@@ -854,7 +854,7 @@ export async function rejectPaymentClaim(_input: {
 }
 
 /**
- * @deprecated Organiser bank-verify removed — paid status is set by Stripe webhook only.
+ * @deprecated Organiser bank-verify removed, paid status is set by Stripe webhook only.
  * Demo mode still unlocks for offline testing.
  */
 export async function verifySessionPayment(input: {
@@ -875,13 +875,13 @@ export async function verifySessionPayment(input: {
     });
   }
   throw new Error(
-    'Manual verify is disabled. Players pay in-app with Stripe — the place unlocks automatically.',
+    'Manual verify is disabled. Players pay in-app with Stripe, the place unlocks automatically.',
   );
 }
 
 /**
  * Paid players (and organisers) get session-room membership so chat unlocks.
- * Safe to call repeatedly — upserts membership when a room already exists.
+ * Safe to call repeatedly, upserts membership when a room already exists.
  */
 export async function ensurePaidSessionRoomAccess(input: {
   sessionId: string;
@@ -1039,7 +1039,7 @@ export async function closeSession(input: {
         displayName: 'Padel Nerdz',
         isGuest: false,
         kind: 'system',
-        body: 'Session closed — this chat is now read-only.',
+        body: 'Session closed, this chat is now read-only.',
       });
     } catch (e) {
       console.warn('closeSession session-room wrap', e);
@@ -1049,7 +1049,7 @@ export async function closeSession(input: {
   return { ...session, status: 'closed', wrap_media_url: wrapUri };
 }
 
-/** What the player pays — court + fixed €1 fee + IVA on the fee. */
+/** What the player pays, court + fixed €1 fee + IVA on the fee. */
 export function totalChargeCents(session: {
   price_cents: number | null;
   commission_cents?: number | null;
@@ -1060,7 +1060,7 @@ export function totalChargeCents(session: {
   ).playerTotalCents;
 }
 
-/** Platform take (fee + IVA) — owner dashboard only, never shown in player UI. */
+/** Platform take (fee + IVA), owner dashboard only, never shown in player UI. */
 export function platformTakeCents(session: {
   price_cents: number | null;
   commission_cents?: number | null;
@@ -1071,7 +1071,7 @@ export function platformTakeCents(session: {
   ).platformTakeCents;
 }
 
-/** Organiser marks a player as did-not-show — reliability drops. */
+/** Organiser marks a player as did-not-show, reliability drops. */
 export async function markSessionNoShow(input: {
   sessionId: string;
   groupId: string;
@@ -1136,7 +1136,7 @@ export async function markSessionCheckIn(input: {
       error.code === '42703' || /checked_in_at/i.test(error.message ?? '');
     if (missingCol) {
       throw new Error(
-        'Check-in isn’t set up on this project yet — apply the check-in migration.',
+        'Check-in isn’t set up on this project yet, apply the check-in migration.',
       );
     }
     throw new Error(error.message || 'Check-in failed');
@@ -1170,7 +1170,7 @@ export type MixinHistoryItem = {
   session_room_id: string | null;
 };
 
-/** Every mix-in this player registered / played — for profile journey. */
+/** Every mix-in this player registered / played, for profile journey. */
 export async function listMyMixinHistory(
   userId: string,
   isGuest: boolean,

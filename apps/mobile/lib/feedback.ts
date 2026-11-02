@@ -14,7 +14,7 @@ type AudioPlayerLike = {
 const players: Partial<Record<SoundKind, AudioPlayerLike>> = {};
 const sources: Partial<Record<SoundKind, number>> = {};
 
-/** Quiet — haptic carries the feel; audio is a soft companion. */
+/** Quiet, haptic carries the feel; audio is a soft companion. */
 const VOLUMES: Record<SoundKind, number> = {
   tick: 0.55,
   chat: 0.4,
@@ -99,7 +99,7 @@ function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
-/** Fire haptics immediately — never wait on audio. */
+/** Fire haptics immediately, never wait on audio. */
 async function buzz(
   ios: () => Promise<void>,
   android: Haptics.AndroidHaptics = Haptics.AndroidHaptics.Keyboard_Tap,
@@ -119,7 +119,7 @@ async function buzz(
   }
 }
 
-/** Firm press — feel it on every tap. */
+/** Firm press, feel it on every tap. */
 export async function tap() {
   await buzz(
     () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
@@ -148,7 +148,7 @@ export async function warn() {
   );
 }
 
-/** Register interest — strong roll then soft tick. */
+/** Register interest, strong roll then soft tick. */
 export async function registerPulse(channelId?: string) {
   void playSound('tick', channelId);
   await buzz(
@@ -168,7 +168,7 @@ export async function registerPulse(channelId?: string) {
 }
 
 /**
- * Revolut-style transfer cascade — soft ticks building to a success thud.
+ * Revolut-style transfer cascade, soft ticks building to a success thud.
  * Use when registering interest for a mix-in.
  */
 export async function revolutPulse(channelId?: string) {
@@ -200,7 +200,7 @@ export async function revolutPulse(channelId?: string) {
   );
 }
 
-/** Confetti / acceptance — big celebration feel. */
+/** Confetti / acceptance, big celebration feel. */
 export async function celebratePulse() {
   void playSound('success');
   await buzz(
@@ -224,7 +224,7 @@ export async function celebratePulse() {
   );
 }
 
-/** New chat message — quiet pop + selection buzz. */
+/** New chat message, quiet pop + selection buzz. */
 export async function chatAlert(channelId: string) {
   void playSound('chat', channelId);
   await buzz(
@@ -233,7 +233,7 @@ export async function chatAlert(channelId: string) {
   );
 }
 
-/** You just sent a message — soft tick (outgoing). */
+/** You just sent a message, soft tick (outgoing). */
 export async function messageSent(channelId?: string) {
   void playSound('tick', channelId);
   await buzz(
@@ -242,7 +242,7 @@ export async function messageSent(channelId?: string) {
   );
 }
 
-/** Save / confirm — soft double thud + success haptic. */
+/** Save / confirm, soft double thud + success haptic. */
 export async function success(channelId?: string) {
   void playSound('success', channelId);
   await buzz(
@@ -256,7 +256,7 @@ export async function success(channelId?: string) {
   );
 }
 
-/** Payment confirmed — richer thud + heavy cascade. */
+/** Payment confirmed, richer thud + heavy cascade. */
 export async function paymentSuccess() {
   void playSound('confirm');
   await buzz(

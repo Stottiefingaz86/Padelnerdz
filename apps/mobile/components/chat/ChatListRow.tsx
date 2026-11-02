@@ -12,7 +12,7 @@ type Props = {
   accent?: string;
   unread?: number;
   subtitle?: string;
-  /** Group / peer photo — falls back to initial letter. */
+  /** Group / peer photo, falls back to initial letter. */
   imageUri?: string | null;
 };
 

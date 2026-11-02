@@ -41,7 +41,7 @@ export default function WelcomeScreen() {
             Your padel groups,{'\n'}organised.
           </Animated.Text>
           <Animated.Text entering={FadeInDown.delay(110).duration(320)} style={styles.copy}>
-            Group chats, mix-in sign-ups, and court sessions — built for clubs and regulars.
+            Group chats, mix-in sign-ups, and court sessions, built for clubs and regulars.
           </Animated.Text>
         </Animated.View>
 

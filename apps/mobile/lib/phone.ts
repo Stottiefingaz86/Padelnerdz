@@ -8,7 +8,7 @@ export type CountryOption = {
   example: string;
 };
 
-/** Common padel markets first — WhatsApp-style dial code picker. */
+/** Common padel markets first, WhatsApp-style dial code picker. */
 export const COUNTRIES: CountryOption[] = [
   { code: 'ES', dial: '+34', label: 'Spain', minNational: 9, maxNational: 9, example: '612 345 678' },
   { code: 'GB', dial: '+44', label: 'United Kingdom', minNational: 10, maxNational: 10, example: '7700 900123' },

@@ -45,17 +45,17 @@ function stateCopy(state: MyRegistrationState): { label: string; note: string } 
     case 'selected_pay':
       return {
         label: 'Pay to confirm',
-        note: 'You were selected. Pay in-app with Stripe to lock your place — session chat unlocks automatically when payment succeeds.',
+        note: 'You were selected. Pay in-app with Stripe to lock your place, session chat unlocks automatically when payment succeeds.',
       };
     case 'awaiting_verify':
       return {
         label: 'Waiting for organiser',
-        note: 'Payment is processing. If Stripe already succeeded, pull to refresh — session chat unlocks when the webhook confirms.',
+        note: 'Payment is processing. If Stripe already succeeded, pull to refresh, session chat unlocks when the webhook confirms.',
       };
     case 'paid':
       return {
         label: 'Place confirmed',
-        note: 'Organiser verified your payment. You’re in. If life gets in the way, you can pull out with notice — no in-app refund; settle money with the organiser directly if needed.',
+        note: 'Organiser verified your payment. You’re in. If life gets in the way, you can pull out with notice, no in-app refund; settle money with the organiser directly if needed.',
       };
     case 'withdrawn':
       return {
@@ -103,7 +103,7 @@ export default function SessionDetailScreen() {
       return;
     }
     if (!s) {
-      setMessage('Mix-in not found — open it from Admin if you just created it.');
+      setMessage('Mix-in not found, open it from Admin if you just created it.');
       return;
     }
 
@@ -148,7 +148,7 @@ export default function SessionDetailScreen() {
           title: 'You’re in the mix-in!',
           body: nextState === 'paid'
             ? 'Place locked. Open session chat and make memories.'
-            : 'Organiser picked you — pay to lock your spot.',
+            : 'Organiser picked you, pay to lock your spot.',
         });
         const unlocked = await syncAchievementsFromStats({ mixinsPlayed: 1 });
         if (unlocked.length) {
@@ -180,7 +180,7 @@ export default function SessionDetailScreen() {
       });
       await revolutPulse(id);
       await load();
-      setMessage('Interest registered. The organiser will confirm the lineup — you are not in yet.');
+      setMessage('Interest registered. The organiser will confirm the lineup, you are not in yet.');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Could not register');
     } finally {
@@ -404,7 +404,7 @@ export default function SessionDetailScreen() {
               <View style={styles.orgBlock}>
                 <Text style={styles.orgLabel}>Organiser</Text>
                 <Text style={styles.orgHint}>
-                  Players pay with Stripe. Places unlock automatically — no manual verify.
+                  Players pay with Stripe. Places unlock automatically, no manual verify.
                 </Text>
                 <AppButton
                   label="Fill open spot"

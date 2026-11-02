@@ -31,10 +31,10 @@ function describeError(e: unknown): string {
     const parts = [row.message, row.details, row.hint].filter(
       (p): p is string => typeof p === 'string' && p.trim().length > 0,
     );
-    if (parts.length) return parts.join(' — ');
+    if (parts.length) return parts.join(', ');
     if (row.code) return `Could not create group (${row.code})`;
   }
-  return 'Could not create group — try again or sign out and back in';
+  return 'Could not create group, try again or sign out and back in';
 }
 
 function placeFromGeocode(row: Location.LocationGeocodedAddress) {
@@ -111,13 +111,13 @@ export default function CreateGroupScreen() {
       });
       const label = places.map(placeFromGeocode).find(Boolean);
       if (!label) {
-        setError('Couldn’t read a town from GPS — type your city instead.');
+        setError('Couldn’t read a town from GPS, type your city instead.');
         return;
       }
       setLocation(label);
     } catch {
       void warn();
-      setError('Location failed — type any town or city instead.');
+      setError('Location failed, type any town or city instead.');
     } finally {
       setLocating(false);
     }
@@ -140,7 +140,7 @@ export default function CreateGroupScreen() {
       return;
     }
     if (!location.trim()) {
-      setError('Add a town or city — use location or type it.');
+      setError('Add a town or city, use location or type it.');
       return;
     }
     if (needsLevel && !levelChoice) {
@@ -229,7 +229,7 @@ export default function CreateGroupScreen() {
 
       <Text style={styles.label}>Area</Text>
       <Text style={styles.help}>
-        Use your location or type any town / city — not limited to a fixed list.
+        Use your location or type any town / city, not limited to a fixed list.
       </Text>
       <Pressable
         style={[styles.locateBtn, locating && { opacity: 0.6 }]}
@@ -265,7 +265,7 @@ export default function CreateGroupScreen() {
           allowAll
           onChange={setLevelChoice}
           label="Who can join"
-          help="All levels, one level, or a band — e.g. Beginner through Intermediate."
+          help="All levels, one level, or a band, e.g. Beginner through Intermediate."
         />
       ) : null}
 
@@ -292,7 +292,7 @@ export default function CreateGroupScreen() {
         </View>
       ) : (
         <Text style={styles.help}>
-          Add friends from player profiles first — then you can invite them into new groups.
+          Add friends from player profiles first, then you can invite them into new groups.
         </Text>
       )}
 

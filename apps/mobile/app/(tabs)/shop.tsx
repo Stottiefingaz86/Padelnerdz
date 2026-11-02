@@ -13,7 +13,7 @@ const KIND_MARK: Record<(typeof NERDZ_MERCH)[number]['kind'], string> = {
   sweatband: 'WR',
 };
 
-/** Shop tab stays visible — catalogue is locked behind Coming soon. */
+/** Shop tab stays visible, catalogue is locked behind Coming soon. */
 export default function ShopScreen() {
   const insets = useSafeAreaInsets();
 

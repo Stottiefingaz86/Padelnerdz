@@ -233,7 +233,7 @@ export async function listGroupMembers(
       display_name: m.display_name,
       role: m.role,
       organiser_level: m.organiser_level,
-      // Private organiser notes — never leak to regular members
+      // Private organiser notes, never leak to regular members
       notes: viewerIsOrganiser ? m.notes : '',
       sessions_played: m.sessions_played,
       no_shows: m.no_shows,
@@ -617,10 +617,10 @@ export async function createGroup(
 
   if (error) {
     const parts = [error.message, error.details, error.hint].filter(Boolean);
-    const msg = parts.join(' — ') || 'Could not create group';
+    const msg = parts.join(', ') || 'Could not create group';
     if (/foreign key|profiles/i.test(msg)) {
       throw new Error(
-        'Your profile isn’t ready yet — open Profile, wait a moment, then try again.',
+        'Your profile isn’t ready yet, open Profile, wait a moment, then try again.',
       );
     }
     if (/row-level security|permission|42501/i.test(msg)) {
@@ -632,7 +632,7 @@ export async function createGroup(
     throw new Error(msg);
   }
 
-  if (!data) throw new Error('Group created but no data returned — check Chats.');
+  if (!data) throw new Error('Group created but no data returned, check Chats.');
 
   const summary = mapGroup(data, { role: 'owner', member_count: 1, is_member: true });
 
@@ -789,7 +789,7 @@ export async function joinGroup(
       !playerMeetsGroupLevel(g.skill_level, getGuestSkillLevel(), g.skill_level_max)
     ) {
       throw new Error(
-        `This group is ${formatGroupLevelBand(g.skill_level, g.skill_level_max)} — your level doesn’t fit`,
+        `This group is ${formatGroupLevelBand(g.skill_level, g.skill_level_max)}, your level doesn’t fit`,
       );
     }
     const joined = joinDemoGroup(groupId, userId, name);
@@ -863,7 +863,7 @@ export async function requestToJoinGroup(
     displayName: 'Padel Nerdz',
     isGuest: false,
     kind: 'system',
-    body: `${displayName} requested to join — organisers can approve in Admin`,
+    body: `${displayName} requested to join, organisers can approve in Admin`,
     payload: { event: 'join_request', user_id: userId },
   });
 }

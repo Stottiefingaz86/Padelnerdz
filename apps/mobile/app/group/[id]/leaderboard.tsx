@@ -120,7 +120,7 @@ export default function GroupLeaderboardScreen() {
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No points yet</Text>
             <Text style={styles.emptyBody}>
-              Play a mix-in and confirm your place — the ladder fills as the group plays.
+              Play a mix-in and confirm your place, the ladder fills as the group plays.
             </Text>
           </View>
         ) : (

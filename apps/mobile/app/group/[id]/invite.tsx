@@ -147,7 +147,7 @@ export default function InviteScreen() {
           await Contact.presentAccessPicker();
         }
       } catch {
-        // presentAccessPicker is iOS 18+ — ignore on older OS
+        // presentAccessPicker is iOS 18+, ignore on older OS
       }
 
       const rows = await fetchAllContacts();
@@ -303,7 +303,7 @@ export default function InviteScreen() {
                 <View style={styles.copy}>
                   <Text style={styles.name}>Share invite link</Text>
                   <Text style={styles.meta}>
-                    Code {group?.invite_code ?? '—'} · anyone with the link can join
+                    Code {group?.invite_code ?? '-'} · anyone with the link can join
                   </Text>
                 </View>
               </Pressable>
@@ -316,7 +316,7 @@ export default function InviteScreen() {
                   <View style={styles.copy}>
                     <Text style={styles.name}>Pick a contact</Text>
                     <Text style={styles.meta}>
-                      Opens your phone book — works even if the full list fails
+                      Opens your phone book, works even if the full list fails
                     </Text>
                   </View>
                 </Pressable>

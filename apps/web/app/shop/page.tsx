@@ -17,7 +17,7 @@ export default function ShopPage() {
         </p>
         <h1 className="mt-3 text-4xl font-bold tracking-[-0.03em]">Shop</h1>
         <p className="mt-4 leading-relaxed text-[#B5B5B5]">
-          Merch and gear for the circuit — not open yet.
+          Merch and gear for the circuit, not open yet.
         </p>
       </div>
     </main>

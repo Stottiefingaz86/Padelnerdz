@@ -25,7 +25,7 @@ export async function setBiometricLockEnabled(on: boolean): Promise<void> {
   await AsyncStorage.setItem(KEY, on ? '1' : '0');
 }
 
-/** Clear lock without biometrics — escape hatch when Face ID is broken. */
+/** Clear lock without biometrics, escape hatch when Face ID is broken. */
 export async function clearBiometricLock(): Promise<void> {
   await AsyncStorage.setItem(KEY, '0');
 }
@@ -102,7 +102,7 @@ function authError(result: AuthAttempt): string | undefined {
 
 /**
  * Launch the system Face ID / biometrics sheet.
- * Always calls authenticateAsync — never soft-skip (that looked like a dead button).
+ * Always calls authenticateAsync, never soft-skip (that looked like a dead button).
  */
 async function presentBiometricPrompt(input: {
   promptMessage: string;
@@ -134,7 +134,7 @@ function mapAuthFailure(result: AuthAttempt, label: string): UnlockResult {
     };
   }
   if (reason === 'user_cancel' || reason === 'system_cancel' || reason === 'app_cancel') {
-    return { success: false, error: 'Cancelled — tap Unlock to try Face ID again' };
+    return { success: false, error: 'Cancelled, tap Unlock to try Face ID again' };
   }
   if (reason === 'not_enrolled') {
     return {

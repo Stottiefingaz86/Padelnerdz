@@ -166,7 +166,7 @@ export default function ProfileScreen() {
             <Text style={styles.meta} numberOfLines={2}>
               {configured
                 ? (profile?.phone_e164 ?? 'Phone linked when SMS is enabled')
-                : 'Demo mode — OTP goes live once SMS is enabled'}
+                : 'Demo mode, OTP goes live once SMS is enabled'}
             </Text>
             <View style={styles.levelRow}>
               <View style={styles.levelPill}>
@@ -249,11 +249,11 @@ export default function ProfileScreen() {
           <Stat label="Points" value={String(stats?.points ?? 0)} />
           <Stat
             label="Reliability"
-            value={stats?.reliability == null ? '—' : `${stats.reliability}%`}
+            value={stats?.reliability == null ? '-' : `${stats.reliability}%`}
           />
           <Stat
             label="Best finish"
-            value={stats?.bestFinish != null ? `#${stats.bestFinish}` : '—'}
+            value={stats?.bestFinish != null ? `#${stats.bestFinish}` : '-'}
           />
           <Stat label="No-shows" value={String(stats?.noShows ?? 0)} />
         </View>
@@ -273,7 +273,7 @@ export default function ProfileScreen() {
       <Animated.View entering={FadeInDown.delay(90).duration(280)} style={styles.statsCard}>
         <Text style={styles.sectionTitle}>Missions</Text>
         <Text style={styles.journeySub}>
-          Medals for firsts, volume, wins, hosting, and reliability — progress as you play.
+          Medals for firsts, volume, wins, hosting, and reliability, progress as you play.
         </Text>
         <View style={styles.achieveGrid}>
           {achievements.map((a) => {
@@ -313,7 +313,7 @@ export default function ProfileScreen() {
       <Animated.View entering={FadeInDown.delay(100).duration(280)} style={styles.statsCard}>
         <Text style={styles.sectionTitle}>Mix-in history</Text>
         <Text style={styles.journeySub}>
-          Every session you’ve been part of — open the room to relive chat & memories.
+          Every session you’ve been part of, open the room to relive chat & memories.
         </Text>
         {history.length === 0 ? (
           <View style={styles.historyEmpty}>
